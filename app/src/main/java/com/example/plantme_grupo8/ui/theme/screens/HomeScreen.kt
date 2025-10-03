@@ -1,4 +1,4 @@
-package com.example.plantme_grupo8.ui.theme
+package com.example.plantme_grupo8.ui.theme.screens
 
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.*
@@ -22,7 +22,7 @@ import com.example.plantme_grupo8.R
 fun HomeScreen() {
     Scaffold(
         topBar = {
-            TopAppBar(tittle = { Text("Mi App Kotlin") })
+            TopAppBar(title = { Text("Mi App Kotlin") })
         }
     ) { innerPadding ->
         Column(
@@ -53,3 +53,4 @@ fun HomeScreen() {
 fun HomeScreenPreview() {
     HomeScreen()
 }
+
