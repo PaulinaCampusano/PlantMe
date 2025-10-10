@@ -12,6 +12,9 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import com.example.plantme_grupo8.ui.theme.PlantMe_Grupo8Theme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import com.example.plantme_grupo8.ui.theme.screens.HomeScreen
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -19,29 +22,31 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
         setContent {
             PlantMe_Grupo8Theme {
-                Scaffold(modifier = Modifier.fillMaxSize()) { innerPadding ->
-                    Greeting(
-                        name = "Android",
-                        modifier = Modifier.padding(innerPadding)
-                    )
+                Surface(color = MaterialTheme.colorScheme.background) {
+                        HomeScreen(
+                            username = "Paulina Campusano"
+                            // Si quisieras usar el padding del Scaffold:
+                            // modifier = Modifier.padding(innerPadding)
+                        )
+                    }
                 }
             }
         }
-    }
-}
 
-@Composable
-fun Greeting(name: String, modifier: Modifier = Modifier) {
-    Text(
-        text = "Hello $name!",
-        modifier = modifier
-    )
-}
+        @Composable
+        fun Greeting(name: String, modifier: Modifier = Modifier) {
+            Text(
+                text = "Hello $name!",
+                modifier = modifier
+            )
+        }
 
-@Preview(showBackground = true)
-@Composable
-fun GreetingPreview() {
-    PlantMe_Grupo8Theme {
-        Greeting("Android")
+        @Preview(showBackground = true)
+        @Composable
+        fun GreetingPreview() {
+            PlantMe_Grupo8Theme {
+                Greeting("Android")
+            }
+        }
+
     }
-}
