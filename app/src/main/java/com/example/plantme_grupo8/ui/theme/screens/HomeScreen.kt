@@ -108,7 +108,7 @@ fun PlantCard(
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
-        tonalElevation = 1.dp,                // Si te marca rojo aquí, estás importando Surface de material (M2). Cambia a material3.*
+        tonalElevation = 1.dp,
         shape = MaterialTheme.shapes.medium
     ) {
         Row(

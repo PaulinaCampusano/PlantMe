@@ -15,6 +15,7 @@ import com.example.plantme_grupo8.ui.theme.PlantMe_Grupo8Theme
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import com.example.plantme_grupo8.ui.theme.screens.HomeHeader
+import com.example.plantme_grupo8.ui.theme.screens.HomeScreen
 
 
 class MainActivity : ComponentActivity() {
@@ -24,7 +25,7 @@ class MainActivity : ComponentActivity() {
         setContent {
             PlantMe_Grupo8Theme {
                 Surface(color = MaterialTheme.colorScheme.background) {
-                    HomeHeader(
+                    HomeScreen(
                         username = "Paulina Campusano"
                         // Si quisieras usar el padding del Scaffold:
                         // modifier = Modifier.padding(innerPadding)
