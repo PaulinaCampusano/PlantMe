@@ -21,7 +21,7 @@ class HomeViewModel : ViewModel() {
             ModelPlant(newId(), "Aloe",   7, System.currentTimeMillis() + 2 * DAY_MS)
         )
     )
-    val plants: StateFlow<List<ModelPlant>> = _plants.asStateFlow()
+    val plants = _plants.asStateFlow()
 
     fun addPlant(name: String, intervalDays: Int) {
         val p = ModelPlant(
@@ -33,15 +33,6 @@ class HomeViewModel : ViewModel() {
         _plants.update { it + p }
     }
 
-    fun markWateredNow(id: Long) {
-        _plants.update { list ->
-            list.map { p ->
-                if (p.id == id)
-                    p.copy(nextWateringAtMillis = System.currentTimeMillis() + p.intervalDays * DAY_MS)
-                else p
-            }
-        }
-    }
 
     fun deletePlant(id: Long) {
         _plants.update { list -> list.filterNot { it.id == id } }
