@@ -108,7 +108,12 @@ fun AccountHeader(
                     .background(Color(0x33000000)),
                 contentAlignment = Alignment.Center
             ) {
-                Icon(Icons.Default.Person, contentDescription = null, tint = Color.White)
+                Icon(
+                    Icons.Default.Person,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier.size(40.dp)
+                )
             }
             Spacer(Modifier.width(16.dp))
             Column {

@@ -19,20 +19,23 @@ import com.example.plantme_grupo8.ui.theme.screens.HomeScreen
 import com.example.plantme_grupo8.ui.theme.screens.AccountScreen
 import com.example.plantme_grupo8.viewModel.HomeViewModel
 import androidx.activity.viewModels
+import com.example.plantme_grupo8.ui.theme.screens.AddPlantScreen
 
 
 class MainActivity : ComponentActivity() {
+
+    private val homeVm: HomeViewModel by viewModels()
+
     override fun onCreate(savedInstanceState: Bundle?) {
+
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
             PlantMe_Grupo8Theme {
-                Surface(color = MaterialTheme.colorScheme.background) {
-                    HomeScreen(
-                        username = "Paulina Campusano"
-                        // Si quisieras usar el padding del Scaffold:
-                        // modifier = Modifier.padding(innerPadding)
-                    )
+                MaterialTheme {
+                    AccountScreen(username = "Paulina Campusano", homeVm = homeVm)
+                    // o HomeScreen(username = "Paulina Campusano", vm = homeVm)
+                }
                     }
                 }
             }
@@ -54,4 +57,3 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-    }
