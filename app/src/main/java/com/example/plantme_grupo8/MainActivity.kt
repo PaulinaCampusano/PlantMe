@@ -16,6 +16,9 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import com.example.plantme_grupo8.ui.theme.screens.HomeHeader
 import com.example.plantme_grupo8.ui.theme.screens.HomeScreen
+import com.example.plantme_grupo8.ui.theme.screens.AccountScreen
+import com.example.plantme_grupo8.viewModel.HomeViewModel
+import androidx.activity.viewModels
 
 
 class MainActivity : ComponentActivity() {
