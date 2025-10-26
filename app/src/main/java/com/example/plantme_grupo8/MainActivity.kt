@@ -24,22 +24,20 @@ import com.example.plantme_grupo8.ui.theme.screens.AddPlantScreen
 
 class MainActivity : ComponentActivity() {
 
-    private val homeVm: HomeViewModel by viewModels()
+    //private val homeVm: HomeViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
 
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         setContent {
-            PlantMe_Grupo8Theme {
-                MaterialTheme {
-                    AccountScreen(username = "Paulina Campusano", homeVm = homeVm)
-                    // o HomeScreen(username = "Paulina Campusano", vm = homeVm)
-                }
-                    }
-                }
-            }
+            //PlantMe_Grupo8Theme {
+                PlantMeApp()
+            //}
         }
+    }
+}
+
 
         @Composable
         fun Greeting(name: String, modifier: Modifier = Modifier) {
