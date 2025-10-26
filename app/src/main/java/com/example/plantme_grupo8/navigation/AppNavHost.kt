@@ -1,97 +1,45 @@
 package com.example.plantme_grupo8.navigation
 
-import androidx.compose.animation.core.tween
-import androidx.compose.animation.slideInHorizontally
-import androidx.compose.animation.slideOutHorizontally
+
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Modifier
-import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import androidx.navigation.compose.rememberNavController
-import androidx.navigation.navArgument
-import com.example.plantme_grupo8.ui.screens.auth.LoginScreen
-import com.example.plantme_grupo8.ui.screens.auth.RegisterScreen
-import com.example.plantme_grupo8.ui.screens.plant.PlantFormScreen
-import com.example.plantme_grupo8.ui.screens.settings.SettingsScreen
-import com.example.plantme_grupo8.ui.wrappers.HomeRoute
+import androidx.navigation.NavHostController
+import com.example.plantme_grupo8.viewModel.HomeViewModel
+import com.example.plantme_grupo8.ui.theme.screens.AccountScreen
+import com.example.plantme_grupo8.ui.theme.screens.AddPlantScreen
+import com.example.plantme_grupo8.ui.theme.screens.HomeScreen
+
 
 @Composable
 fun AppNavHost(
-    modifier: Modifier = Modifier,
-    startDestination: String = AppRoute.Login.route
+    navController: NavHostController,
+    homeVm: HomeViewModel,
+    username: String
 ) {
-    val navController = rememberNavController()
-    val slide = 250
-
     NavHost(
         navController = navController,
-        startDestination = startDestination,
-        modifier = modifier,
-        // Animaciones simples y estables (aporta a IL2.2)
-        enterTransition = {
-            slideInHorizontally(animationSpec = tween(slide)) { fullWidth -> fullWidth }
-        },
-        exitTransition = {
-            slideOutHorizontally(animationSpec = tween(slide)) { fullWidth -> -fullWidth }
-        },
-        popEnterTransition = {
-            slideInHorizontally(animationSpec = tween(slide)) { fullWidth -> -fullWidth }
-        },
-        popExitTransition = {
-            slideOutHorizontally(animationSpec = tween(slide)) { fullWidth -> fullWidth }
-        }
+        startDestination = AppRoute.Home.route
     ) {
-        composable(AppRoute.Login.route) {
-            LoginScreen(
-                onLoginOk = {
-                    navController.navigate(AppRoute.Home.route) {
-                        popUpTo(0) // limpia el back stack; no vuelves a Login con back
-                    }
-                },
-                onGoToRegister = { navController.navigate(AppRoute.Register.route) }
-            )
-        }
-
-        composable(AppRoute.Register.route) {
-            RegisterScreen(
-                onRegisterOk = {
-                    navController.navigate(AppRoute.Home.route) {
-                        popUpTo(0)
-                    }
-                },
-                onBack = { navController.popBackStack() }
-            )
-        }
-
         composable(AppRoute.Home.route) {
-            HomeRoute(
-                onAddPlant = { navController.navigate(AppRoute.PlantForm.createRoute()) },
-                onEditPlant = { id -> navController.navigate(AppRoute.PlantForm.createRoute(id)) },
-                onOpenSettings = { navController.navigate(AppRoute.Settings.route) }
-            )
+            HomeScreen(username = username, vm = homeVm)
         }
-
-        composable(
-            route = AppRoute.PlantForm.route,
-            arguments = listOf(
-                navArgument(AppRoute.PlantForm.ARG_PLANT_ID) {
-                    type = NavType.LongType
-                    nullable = true
-                    defaultValue = null
-                }
-            )
-        ) { backStackEntry ->
-            val plantId = backStackEntry.arguments?.getLong(AppRoute.PlantForm.ARG_PLANT_ID)
-            PlantFormScreen(
-                plantId = plantId,
-                onSaved = { navController.popBackStack() },
+        composable(AppRoute.Add.route) {
+            AddPlantScreen(
+                homeVm = homeVm,
+                onSaved = {
+                    // vuelve a Home al guardar
+                    navController.navigate(AppRoute.Home.route) {
+                        popUpTo(AppRoute.Home.route) { saveState = true }
+                        launchSingleTop = true
+                        restoreState = true
+                    }
+                },
                 onCancel = { navController.popBackStack() }
             )
         }
-
-        composable(AppRoute.Settings.route) {
-            SettingsScreen(onBack = { navController.popBackStack() })
+        composable(AppRoute.Account.route) {
+            AccountScreen(username = username, homeVm = homeVm)
         }
     }
 }
