@@ -9,7 +9,8 @@ object SpeciesDefault {
         Species("pothos",       "Pothos",        7),
         Species("aloe",         "Aloe",         14),
         Species("sansevieria",  "Sansevieria",  18),
-        Species("suculenta",    "Suculenta",    21)
+        Species("suculenta",    "Suculenta",    21),
+        Species("test",    "Test",    1)
     )
 
     fun intervalFor(key: String): Int =

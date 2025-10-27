@@ -2,7 +2,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
-    alias(libs.plugins.kotlin.serialization) // añadido (para @Serializable)
+    alias(libs.plugins.kotlin.serialization) // ⬅️ añadido (para @Serializable)
 }
 
 android {
@@ -51,15 +51,21 @@ dependencies {
     implementation(libs.androidx.compose.animation)
     implementation(libs.androidx.navigation.compose)
 
+    implementation(platform("androidx.compose:compose-bom:<versión>"))
+    implementation("androidx.compose.material:material-icons-extended")
     // ViewModel para Compose
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.8.6")
+    implementation("androidx.compose.material3:material3")
+    implementation("androidx.compose.foundation:foundation") // por si acaso
+
 
     // ====== AÑADIDOS PARA PERSISTENCIA Y CORRUTINAS ======
     implementation(libs.androidx.datastore.preferences)    // DataStore (Preferences)
     implementation(libs.kotlinx.serialization.json)        // JSON (kotlinx-serialization)
     implementation(libs.androidx.lifecycle.viewmodel.ktx)  // viewModelScope
     implementation(libs.kotlinx.coroutines.android)        // (recomendado)
-    implementation(libs.androidx.lifecycle.runtime.compose) // (opcional para collectAsStateWithLifecycle)
+    implementation(libs.androidx.lifecycle.runtime.compose)
+    implementation(libs.androidx.compose.foundation) // (opcional para collectAsStateWithLifecycle)
     // =====================================================
 
     testImplementation(libs.junit)

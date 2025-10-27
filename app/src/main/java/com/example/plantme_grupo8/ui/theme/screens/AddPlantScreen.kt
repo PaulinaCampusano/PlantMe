@@ -1,49 +1,125 @@
-//PARA EL DROPMENU SE DEBE DECLARAR QUE SE VA A USAR MATERIAL 3
 @file:OptIn(ExperimentalMaterial3Api::class)
+
 package com.example.plantme_grupo8.ui.theme.screens
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
-import androidx.compose.foundation.clickable
+import androidx.annotation.DrawableRes
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.Image
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowDropDown
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.material.icons.outlined.Add
+import androidx.compose.material3.Button
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.Icon
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.unit.dp
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
+import com.example.plantme_grupo8.R
 import com.example.plantme_grupo8.ui.theme.utils.Species
 import com.example.plantme_grupo8.ui.theme.utils.SpeciesDefault
 import com.example.plantme_grupo8.viewModel.HomeViewModel
+import com.example.plantme_grupo8.viewModel.PlantsViewModel
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
+import androidx.compose.material3.OutlinedTextFieldDefaults
 
+
+/* -----------------------------------------------------------
+   Selector de especie (top-level)
+   ----------------------------------------------------------- */
+@Composable
+private fun SpeciesSelector(
+    speciesList: List<Species>,
+    selectedKey: String,
+    onSelected: (String) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    var ddExpanded by rememberSaveable { mutableStateOf(false) }
+
+    ExposedDropdownMenuBox(
+        expanded = ddExpanded,
+        onExpandedChange = { ddExpanded = !ddExpanded },
+        modifier = modifier
+    ) {
+        OutlinedTextField(
+            value = SpeciesDefault.displayFor(selectedKey),
+            onValueChange = {},
+            readOnly = true,
+            label = { Text("Tipo de planta",color = Color.White) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(ddExpanded) },
+            modifier = Modifier
+                .menuAnchor()             // si da error en tu versión, elimina esta línea
+                .fillMaxWidth() ,
+            colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor   = Color.White,  // borde cuando está activo
+            unfocusedBorderColor = Color.White   // borde cuando NO está activo
+        )
+        )
+
+        DropdownMenu(
+            expanded = ddExpanded,
+            onDismissRequest = { ddExpanded = false }
+        ) {
+            speciesList.forEach { sp ->
+                DropdownMenuItem(
+                    text = { Text(sp.display) },
+                    onClick = {
+                        onSelected(sp.key)
+                        ddExpanded = false
+                    }
+                )
+            }
+        }
+    }
+}
+
+/* -----------------------------------------------------------
+   Pantalla: Agregar planta
+   ----------------------------------------------------------- */
 @Composable
 fun AddPlantScreen(
-    homeVm: HomeViewModel,         // MISMO VM que usa Home
-    onSaved: () -> Unit = {},      // navega atrás luego (cuando tengas Nav)
-    onCancel: () -> Unit = {}
+    homeVm: PlantsViewModel,
+    onSaved: () -> Unit = {},
+    onCancel: () -> Unit = {},
+    @DrawableRes photoRes: Int? = R.drawable.add_header
 ) {
+    // Estado UI
     var name by rememberSaveable { mutableStateOf("") }
-    var expanded by remember { mutableStateOf(false) } // (no se usa; puedes borrarlo si quieres)
-
-    // Tipo seleccionado (por defecto el primero)
     val speciesList = SpeciesDefault.list
     var selectedKey by rememberSaveable { mutableStateOf(speciesList.firstOrNull()?.key ?: "") }
-
-    // Último riego (por defecto ahora)
     var lastWateredMillis by rememberSaveable { mutableStateOf(System.currentTimeMillis()) }
-
-    // Errores simples
     var nameError by remember { mutableStateOf(false) }
 
-    // Pickers
     val ctx = LocalContext.current
     fun pickDate() {
         val c = Calendar.getInstance().apply { timeInMillis = lastWateredMillis }
@@ -80,117 +156,161 @@ fun AddPlantScreen(
     val fmt = remember { SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()) }
     val lastText = remember(lastWateredMillis) { fmt.format(Date(lastWateredMillis)) }
 
-    Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    // ======= LAYOUT PRINCIPAL =======
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
 
-        // INICIO TITULO
-        Text("Agregar planta", style = MaterialTheme.typography.headlineSmall)
-        // FIN TITULO
-
-        // INICIO TEXTBOX NOMBRE PLANTA
-        OutlinedTextField(
-            value = name, // <- NECESARIO para que el nombre se edite correctamente
-            onValueChange = { name = it; nameError = false },
-            label = { Text("Nombre de la planta") },
-            singleLine = true,
-            isError = nameError,
-            supportingText = { if (nameError) Text("Ingresa un nombre") },
-            modifier = Modifier.fillMaxWidth()
-        )
-        // FIN TEXTBOX NOMBRE PLANTA
-
-        // INICIO TIPO DE PLANTA
-        @Composable
-        fun SpeciesSelector(
-            speciesList: List<Species>,
-            selectedKey: String,
-            onSelected: (String) -> Unit,
-            modifier: Modifier = Modifier
+    ) {
+        // ---------- HEADER ----------
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(180.dp)
         ) {
-            var ddExpanded by rememberSaveable { mutableStateOf(false) }
-
-            ExposedDropdownMenuBox(
-                expanded = ddExpanded,
-                onExpandedChange = { ddExpanded = !ddExpanded },
-                modifier = modifier
-            ) {
-                OutlinedTextField(
-                    value = SpeciesDefault.displayFor(selectedKey),
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Tipo de planta") },
-                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(ddExpanded) },
-                    modifier = Modifier
-                        .menuAnchor()
-                        .fillMaxWidth()
+            if (photoRes != null) {
+                Image(
+                    painter = painterResource(id = photoRes),
+                    contentDescription = null,
+                    contentScale = ContentScale.Crop,
+                    modifier = Modifier.matchParentSize()
                 )
-
-                ExposedDropdownMenu(
-                    expanded = ddExpanded,
-                    onDismissRequest = { ddExpanded = false }
-                ) {
-                    speciesList.forEach { sp ->
-                        DropdownMenuItem(
-                            text = { Text(sp.display) },
-                            onClick = {
-                                onSelected(sp.key)
-                                ddExpanded = false
-                            }
+            }
+            // Scrim general
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(Color(0x33000000))
+            )
+            // Gradiente superior
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .background(
+                        Brush.verticalGradient(
+                            colorStops = arrayOf(
+                                0.00f to Color(0xCC000000),
+                                0.35f to Color(0x99000000),
+                                0.70f to Color(0x33000000),
+                                1.00f to Color(0x33000000)
+                            )
                         )
-                    }
-                }
+                    )
+            )
+            // Título
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .statusBarsPadding()
+                    .padding(horizontal = 16.dp, vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Icon(
+                    imageVector = Icons.Outlined.Add,
+                    contentDescription = null,
+                    tint = Color.White,
+                    modifier = Modifier
+                        .size(29.dp)
+                        .clip(CircleShape)
+                )
+                Spacer(Modifier.width(8.dp))
+                Text(
+                    text = "Agregar planta",
+                    color = Color.White,
+                    fontSize = 27.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.weight(1f)
+                )
             }
         }
 
-        // llamada al selector (NECESARIA para actualizar selectedKey)
-        SpeciesSelector(
-            speciesList = speciesList,
-            selectedKey = selectedKey,
-            onSelected = { selectedKey = it },
-            modifier = Modifier.fillMaxWidth()
-        )
-        // FINAL TIPO DE PLANTA
+        // ---------- PADDING ENTRE HEADER Y CONTENIDO ----------
+        Spacer(Modifier.height(16.dp))
 
-        // INICIO ULTIMO RIEGO
-        OutlinedTextField(
-            value = lastText,
-            onValueChange = {},
-            readOnly = true,
-            label = { Text("Último riego (fecha y hora)") },
-            trailingIcon = {
-                Row {
-                    TextButton(onClick = { pickDate() }) { Text("Fecha") }
-                    TextButton(onClick = { pickTime() }) { Text("Hora") }
-                }
-            },
-            modifier = Modifier.fillMaxWidth()
-        )
+        // ---------- CONTENIDO (FORM) ----------
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 22.dp),
 
-        Spacer(Modifier.height(8.dp))
-        // FINAL ULTIMO RIEGO
 
-        // INICIO BOTONES CANCELAR Y GUARDAR
-        Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-            OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
-                Text("Cancelar")
-            }
-            Button(
-                onClick = {
-                    nameError = name.isBlank()
-                    if (!nameError) {
-                        // AUTOMÁTICO: calcula intervalo por tipo y guarda
-                        homeVm.addPlantAuto(
-                            name = name.trim(),
-                            speciesKey = selectedKey,
-                            lastWateredAtMillis = lastWateredMillis
-                        )
-                        onSaved()
+
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
+            // INICIO TEXTBOX NOMBRE PLANTA
+            OutlinedTextField(
+                value = name, // <- NECESARIO para que el nombre se edite correctamente
+                onValueChange = { name = it; nameError = false },
+                label = { Text("Nombre de la planta", color = Color.White) },
+                singleLine = true,
+                isError = nameError,
+                supportingText = { if (nameError) Text("Ingresa un nombre") },
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor   = Color.White,  // borde cuando está activo
+                    unfocusedBorderColor = Color.White   // borde cuando NO está activo
+
+
+                )
+            )
+            // FIN TEXTBOX NOMBRE PLANTA
+
+            // Tipo de planta
+            SpeciesSelector(
+                speciesList = speciesList,
+                selectedKey = selectedKey,
+                onSelected = { selectedKey = it },
+                modifier = Modifier.fillMaxWidth(),
+
+
+            )
+
+            // Último riego
+            OutlinedTextField(
+                value = lastText,
+                onValueChange = {},
+                readOnly = true,
+                label = { Text("Último riego (fecha y hora)", color = Color.White) },
+                trailingIcon = {
+                    Row {
+                        TextButton(onClick = { pickDate() }) { Text("Fecha") }
+                        TextButton(onClick = { pickTime() }) { Text("Hora") }
                     }
                 },
-                modifier = Modifier.weight(1f)
-            ) {
-                Text("Guardar")
+                modifier = Modifier.fillMaxWidth(),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor   = Color.White,  // borde cuando está activo
+                    unfocusedBorderColor = Color.White   // borde cuando NO está activo
+                )
+            )
+
+            // Botones
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(
+                    onClick = onCancel,
+                    border = BorderStroke(1.dp, Color.White),               // color y grosor del borde
+                    // shape = RoundedCornerShape(12.dp) // (opcional) esquinas redondeadas
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Cancelar",color = Color.White)
+                }
+                Button(
+                    onClick = {
+                        nameError = name.isBlank()
+                        if (!nameError) {
+                            homeVm.addPlantAuto(
+                                name = name.trim(),
+                                speciesKey = selectedKey,
+                                lastWateredAtMillis = lastWateredMillis
+                            )
+                            onSaved()
+                        }
+                    },
+                    modifier = Modifier.weight(1f)
+                ) {
+                    Text("Guardar")
+                }
             }
         }
-        // FINAL BOTONES CANCELAR Y GUARDAR
     }
 }

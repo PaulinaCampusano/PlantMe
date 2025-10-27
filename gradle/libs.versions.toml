@@ -15,6 +15,7 @@ serialization = "1.7.3"
 lifecycle = "2.8.6"
 coroutines = "1.9.0"
 material3 = "1.4.0"
+foundation = "1.9.4"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -40,6 +41,7 @@ androidx-lifecycle-viewmodel-ktx = { module = "androidx.lifecycle:lifecycle-view
 kotlinx-coroutines-android       = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "coroutines" }
 androidx-lifecycle-runtime-compose = { module = "androidx.lifecycle:lifecycle-runtime-compose", version.ref = "lifecycle" }
 androidx-compose-material3 = { group = "androidx.compose.material3", name = "material3", version.ref = "material3" }
+androidx-compose-foundation = { group = "androidx.compose.foundation", name = "foundation", version.ref = "foundation" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
