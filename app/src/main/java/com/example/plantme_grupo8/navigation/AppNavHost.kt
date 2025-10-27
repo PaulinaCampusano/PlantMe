@@ -1,6 +1,5 @@
 package com.example.plantme_grupo8.navigation
 
-
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -9,13 +8,13 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.example.plantme_grupo8.ui.theme.screens.*
 import com.example.plantme_grupo8.viewModel.AuthViewModel
-import com.example.plantme_grupo8.viewModel.PlantsViewModel   // ⬅️ IMPORT CORRECTO
+import com.example.plantme_grupo8.viewModel.PlantsViewModel
 
 @Composable
 fun AppNavHost(
     navController: NavHostController,
     authVm: AuthViewModel,
-    plantsVm: PlantsViewModel        // ⬅️ RECIBE PlantsViewModel
+    plantsVm: PlantsViewModel // ← sin coma final
 ) {
     val logged by authVm.isLoggedIn.collectAsState()
     val session by authVm.session.collectAsState()
@@ -27,11 +26,11 @@ fun AppNavHost(
             startDestination = AppRoute.Home.route
         ) {
             composable(AppRoute.Home.route) {
-                HomeScreen(username = username, vm = plantsVm) // ⬅️ pasa PlantsViewModel
+                HomeScreen(username = username, vm = plantsVm) // pasa PlantsViewModel
             }
             composable(AppRoute.Add.route) {
                 AddPlantScreen(
-                    homeVm = plantsVm,                            // ⬅️ pasa PlantsViewModel
+                    homeVm = plantsVm,
                     onSaved = {
                         navController.navigate(AppRoute.Home.route) {
                             popUpTo(AppRoute.Home.route) { saveState = true }
@@ -43,11 +42,12 @@ fun AppNavHost(
                 )
             }
             composable(AppRoute.Account.route) {
-                // Si tu AccountScreen usa solo .plants, cambia su parámetro a PlantsViewModel
-                AccountScreen( username = username,
+                AccountScreen(
+                    username = username,
                     homeVm = plantsVm,
-                    onLogout = { authVm.logout() },                 // ← agrega
-                    onDeleteAccount = { authVm.deleteLocalAccount() } )
+                    onLogout = { authVm.logout() },
+                    onDeleteAccount = { authVm.deleteLocalAccount() }
+                )
             }
         }
     } else {

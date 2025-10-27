@@ -20,9 +20,16 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.viewmodel.compose.viewModel
 import com.example.plantme_grupo8.viewModel.AuthViewModel
+import com.example.plantme_grupo8.viewModel.UiBusViewModel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.max
+import androidx.compose.ui.platform.LocalContext
+import androidx.lifecycle.ViewModelStoreOwner
+
+private const val MIN_LOADING_MS = 60L // ⇠ duración mínima visible del loader
 
 @Composable
 fun LoginScreen(
@@ -33,10 +40,16 @@ fun LoginScreen(
     val isLogged by vm.isLoggedIn.collectAsState()
     val scope = rememberCoroutineScope()
     val focus = LocalFocusManager.current
+    val owner = LocalContext.current as ViewModelStoreOwner
+    val uiBus: UiBusViewModel = viewModel(owner)
 
-    // navega cuando el VM marque sesión iniciada
+    // Cuando el VM marque sesión iniciada, dejamos el loader un rato y luego navegamos
     LaunchedEffect(isLogged) {
-        if (isLogged) onLoggedIn()
+        if (isLogged) {
+            delay(MIN_LOADING_MS) // ⇠ fuerza a que se note la carga en éxito
+            uiBus.hideLoading()
+            onLoggedIn()
+        }
     }
 
     // UI state
@@ -53,12 +66,10 @@ fun LoginScreen(
             .fillMaxSize()
             .background(screenBg)
     ) {
-        // Banner reutilizando HomeHeader
         HomeHeader(username = "Inicia sesión")
 
         Spacer(Modifier.height(16.dp))
 
-        // Card/form
         Surface(
             modifier = Modifier
                 .fillMaxWidth()
@@ -83,7 +94,7 @@ fun LoginScreen(
                     label = { Text("Email") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(           // <-- paquete correcto
+                    keyboardOptions = KeyboardOptions(
                         imeAction = ImeAction.Next,
                         keyboardType = KeyboardType.Email
                     ),
@@ -99,7 +110,7 @@ fun LoginScreen(
                     label = { Text("Contraseña") },
                     modifier = Modifier.fillMaxWidth(),
                     singleLine = true,
-                    keyboardOptions = KeyboardOptions(           // <-- paquete correcto
+                    keyboardOptions = KeyboardOptions(
                         imeAction = ImeAction.Done,
                         keyboardType = KeyboardType.Password
                     ),
@@ -118,7 +129,6 @@ fun LoginScreen(
                     }
                 )
 
-                // error simple cuando intentó y sigue sin loguear
                 val showBadCreds = tried && !submitting && !isLogged
                 if (showBadCreds) {
                     Text(
@@ -133,12 +143,26 @@ fun LoginScreen(
                         tried = true
                         if (!emailValid(email) || pass.isBlank()) return@Button
                         focus.clearFocus()
-                        submitting = true
-                        vm.login(email, pass)
-                        // pequeña espera para que DataStore procese; el LaunchedEffect hará la navegación
+
                         scope.launch {
-                            delay(350)
-                            submitting = false
+                            submitting = true
+                            uiBus.showLoading()
+                            val start = System.currentTimeMillis()
+
+                            try {
+                                vm.login(email, pass)
+                                // pequeño colchón para DataStore u otros side-effects
+                                delay(250)
+                            } finally {
+                                // Si NO se logueó, garantizamos que el loader quede al menos MIN_LOADING_MS
+                                val elapsed = System.currentTimeMillis() - start
+                                val remain = max(0, (MIN_LOADING_MS - elapsed).toInt())
+                                if (!isLogged) {
+                                    if (remain > 0) delay(remain.toLong())
+                                    uiBus.hideLoading()
+                                }
+                                submitting = false
+                            }
                         }
                     },
                     modifier = Modifier.fillMaxWidth(),
@@ -158,9 +182,7 @@ fun LoginScreen(
     }
 }
 
-/* =============================
- *  Helpers
- * ============================= */
+/* Helpers */
 private fun emailValid(e: String): Boolean {
     val EMAIL_RE = Regex("^[^\\s@]+@[^\\s@]+\\.[^\\s@]+$")
     return EMAIL_RE.matches(e.trim())

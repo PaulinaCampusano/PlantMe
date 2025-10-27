@@ -45,7 +45,6 @@ import androidx.compose.ui.unit.sp
 import com.example.plantme_grupo8.R
 import com.example.plantme_grupo8.ui.theme.utils.Species
 import com.example.plantme_grupo8.ui.theme.utils.SpeciesDefault
-import com.example.plantme_grupo8.viewModel.HomeViewModel
 import com.example.plantme_grupo8.viewModel.PlantsViewModel
 import java.text.SimpleDateFormat
 import java.util.Calendar
