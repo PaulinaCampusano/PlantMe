@@ -145,6 +145,14 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             persist(updated)
             _plants.value = updated
         }
+
+    }
+
+    fun markWateredNow(id: Long) {
+        updatePlant(
+            id = id,
+            lastWateredAtMillis = System.currentTimeMillis() // tu updatePlant recalcula next con esto
+        )
     }
 
 }

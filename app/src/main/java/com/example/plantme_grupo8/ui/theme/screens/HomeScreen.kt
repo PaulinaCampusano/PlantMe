@@ -65,6 +65,8 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.compose.material3.Button
+import androidx.compose.ui.text.style.TextOverflow
 
 
 
@@ -114,7 +116,8 @@ fun HomeHeader(username: String) {
 fun PlantCard(
     plant: ModelPlant,
     onDelete: (() -> Unit)? = null,
-    onEdit: (() -> Unit)? = null // Agregamos el parametro que usaremos en la funcion
+    onEdit: (() -> Unit)? = null, // Agregamos el parametro que usaremos en la funcion
+    onWaterNow: (() -> Unit)? = null
 ) {
     var remainingMs by remember(plant.id) { mutableStateOf(0L) }
 
@@ -124,6 +127,7 @@ fun PlantCard(
             delay(1_000)
         }
     }
+    val isDue = remainingMs <= 0L
 
     Surface(
         modifier = Modifier.fillMaxWidth(),
@@ -135,8 +139,26 @@ fun PlantCard(
             verticalAlignment = Alignment.CenterVertically
         ) {
             Column(Modifier.weight(1f)) {
-                Text(text = plant.name, style = MaterialTheme.typography.titleMedium)
-                Text(text = "Regar en ${formatRemaining(remainingMs)}")
+                Text(plant.name, style = MaterialTheme.typography.titleMedium)
+                Spacer(Modifier.height(4.dp))
+
+                if (isDue && onWaterNow != null) {
+                    Button(onClick = onWaterNow) { Text("Regado listo!") }
+                    Spacer(Modifier.height(4.dp))
+                    Text(
+                        text = "Atrasada por ${formatRemaining(-remainingMs)}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                } else {
+                    Text(
+                        text = "Regar en ${formatRemaining(remainingMs)}",
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
+                }
             }
             // Icono de editar (para ejecutar el callback)
             if (onEdit != null) {
@@ -152,192 +174,199 @@ fun PlantCard(
         }
     }
 }
-@Composable
-fun HomeScreen(
-    username: String,
-    vm: HomeViewModel = viewModel()  // mismo VM que usará la screen de “Nueva planta”
-) {
-    val plants by vm.plants.collectAsState()  // observamos la lista
 
-    // Planta en edición (null = no editando)
-    var editing by remember { mutableStateOf<ModelPlant?>(null) }
+    @Composable
+    fun HomeScreen(
+        username: String,
+        vm: HomeViewModel = viewModel()  // mismo VM que usará la screen de “Nueva planta”
+    ) {
+        val plants by vm.plants.collectAsState()  // observamos la lista
 
-    Column(Modifier.fillMaxSize()) {
-        HomeHeader(username)                 // 1) tu header
+        // Planta en edición (null = no editando)
+        var editing by remember { mutableStateOf<ModelPlant?>(null) }
 
-        if (plants.isEmpty()) {              // 2) estado vacío
-            Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("Aún no has agregado plantas.", style = MaterialTheme.typography.bodyLarge)
-            }
-        } else {                             // 3) lista de cards
-            LazyColumn(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(12.dp),
-                contentPadding = PaddingValues(bottom = 80.dp)
-            ) {
-                items(plants, key = { it.id }) { p: ModelPlant ->
-                    PlantCard(
-                        plant = p,
-                        onDelete = { vm.deletePlant(p.id) },  // borrar desde el VM
-                        onEdit   = { editing = p } // abre diálogo de edición
-                    )
-                    Spacer(Modifier.height(8.dp))
+        Column(Modifier.fillMaxSize()) {
+            HomeHeader(username)                 // 1) tu header
+
+            if (plants.isEmpty()) {              // 2) estado vacío
+                Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                    Text("Aún no has agregado plantas.", style = MaterialTheme.typography.bodyLarge)
+                }
+            } else {                             // 3) lista de cards
+                LazyColumn(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(12.dp),
+                    contentPadding = PaddingValues(bottom = 80.dp)
+                ) {
+                    items(plants, key = { it.id }) { p: ModelPlant ->
+                        PlantCard(
+                            plant = p,
+                            onDelete = { vm.deletePlant(p.id) },  // borrar desde el VM
+                            onEdit = { editing = p }, // abre diálogo de edición
+                            onWaterNow = { vm.markWateredNow(p.id) }
+                        )
+                        Spacer(Modifier.height(8.dp))
+                    }
                 }
             }
         }
-    }
 
-    //EJECUTAR EL DIALOGO PARA EDITAR
-    editing?.let { plant ->
-        EditPlantDialog(
-            plant = plant,
-            onDismiss = { editing = null },
-            onSave = { name, speciesKey, lastMillis ->
-                vm.updatePlant(
-                    id = plant.id,
-                    name = name,
-                    speciesKey = speciesKey,
-                    lastWateredAtMillis = lastMillis
-                )
-                editing = null
-            }
-        )
-    }
-}
-
-//INICIO DE INTERFAZ PARA EDITAR ITEM
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun EditPlantDialog(
-    plant: ModelPlant,
-    onDismiss: () -> Unit,
-    onSave: (name: String, speciesKey: String, lastWateredAtMillis: Long) -> Unit
-) {
-    val speciesList = SpeciesDefault.list
-
-    var name by remember(plant.id) { mutableStateOf(plant.name) }
-
-    // Forzamos String no-null (si plant.speciesKey es String?)
-    var selectedKey by remember(plant.id) { mutableStateOf(plant.speciesKey ?: "") }
-
-    val DAY_MS = 24L * 60 * 60 * 1000
-    var lastMillis by remember(plant.id) {
-        mutableStateOf(plant.nextWateringAtMillis - plant.intervalDays * DAY_MS)
-    }
-
-    val fmt = remember { SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()) }
-    val lastText = remember(lastMillis) { fmt.format(Date(lastMillis)) }
-
-    val ctx = LocalContext.current
-    fun pickDate() {
-        val c = Calendar.getInstance().apply { timeInMillis = lastMillis }
-        DatePickerDialog(
-            ctx,
-            { _, y, m, d ->
-                c.set(Calendar.YEAR, y)
-                c.set(Calendar.MONTH, m)
-                c.set(Calendar.DAY_OF_MONTH, d)
-                lastMillis = c.timeInMillis
-            },
-            c.get(Calendar.YEAR),
-            c.get(Calendar.MONTH),
-            c.get(Calendar.DAY_OF_MONTH)
-        ).show()
-    }
-    fun pickTime() {
-        val c = Calendar.getInstance().apply { timeInMillis = lastMillis }
-        TimePickerDialog(
-            ctx,
-            { _, h, min ->
-                c.set(Calendar.HOUR_OF_DAY, h)
-                c.set(Calendar.MINUTE, min)
-                c.set(Calendar.SECOND, 0)
-                c.set(Calendar.MILLISECOND, 0)
-                lastMillis = c.timeInMillis
-            },
-            c.get(Calendar.HOUR_OF_DAY),
-            c.get(Calendar.MINUTE),
-            true
-        ).show()
-    }
-
-    var ddExpanded by remember { mutableStateOf(false) }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Editar planta") },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it },
-                    label = { Text("Nombre") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-
-                ExposedDropdownMenuBox(
-                    expanded = ddExpanded,
-                    onExpandedChange = { ddExpanded = !ddExpanded }
-                ) {
-                    OutlinedTextField(
-                        value = SpeciesDefault.displayFor(selectedKey) ?: "", // En caso que devuelva un string
-                        onValueChange = {},
-                        readOnly = true,
-                        label = { Text("Tipo de planta") },
-                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(ddExpanded) },
-                        modifier = Modifier
-                            .menuAnchor()
-                            .fillMaxWidth()
+        //EJECUTAR EL DIALOGO PARA EDITAR
+        editing?.let { plant ->
+            EditPlantDialog(
+                plant = plant,
+                onDismiss = { editing = null },
+                onSave = { name, speciesKey, lastMillis ->
+                    vm.updatePlant(
+                        id = plant.id,
+                        name = name,
+                        speciesKey = speciesKey,
+                        lastWateredAtMillis = lastMillis
                     )
-                    ExposedDropdownMenu(
+                    editing = null
+                }
+            )
+        }
+    }
+
+
+
+    //INICIO DE INTERFAZ PARA EDITAR ITEM
+    @OptIn(ExperimentalMaterial3Api::class)
+    @Composable
+    private fun EditPlantDialog(
+        plant: ModelPlant,
+        onDismiss: () -> Unit,
+        onSave: (name: String, speciesKey: String, lastWateredAtMillis: Long) -> Unit
+    ) {
+        val speciesList = SpeciesDefault.list
+
+        var name by remember(plant.id) { mutableStateOf(plant.name) }
+
+        // Forzamos String no-null (si plant.speciesKey es String?)
+        var selectedKey by remember(plant.id) { mutableStateOf(plant.speciesKey ?: "") }
+
+        val DAY_MS = 24L * 60 * 60 * 1000
+        var lastMillis by remember(plant.id) {
+            mutableStateOf(plant.nextWateringAtMillis - plant.intervalDays * DAY_MS)
+        }
+
+        val fmt = remember { SimpleDateFormat("dd MMM yyyy, HH:mm", Locale.getDefault()) }
+        val lastText = remember(lastMillis) { fmt.format(Date(lastMillis)) }
+
+        val ctx = LocalContext.current
+        fun pickDate() {
+            val c = Calendar.getInstance().apply { timeInMillis = lastMillis }
+            DatePickerDialog(
+                ctx,
+                { _, y, m, d ->
+                    c.set(Calendar.YEAR, y)
+                    c.set(Calendar.MONTH, m)
+                    c.set(Calendar.DAY_OF_MONTH, d)
+                    lastMillis = c.timeInMillis
+                },
+                c.get(Calendar.YEAR),
+                c.get(Calendar.MONTH),
+                c.get(Calendar.DAY_OF_MONTH)
+            ).show()
+        }
+
+        fun pickTime() {
+            val c = Calendar.getInstance().apply { timeInMillis = lastMillis }
+            TimePickerDialog(
+                ctx,
+                { _, h, min ->
+                    c.set(Calendar.HOUR_OF_DAY, h)
+                    c.set(Calendar.MINUTE, min)
+                    c.set(Calendar.SECOND, 0)
+                    c.set(Calendar.MILLISECOND, 0)
+                    lastMillis = c.timeInMillis
+                },
+                c.get(Calendar.HOUR_OF_DAY),
+                c.get(Calendar.MINUTE),
+                true
+            ).show()
+        }
+
+        var ddExpanded by remember { mutableStateOf(false) }
+
+        AlertDialog(
+            onDismissRequest = onDismiss,
+            title = { Text("Editar planta") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+
+                    OutlinedTextField(
+                        value = name,
+                        onValueChange = { name = it },
+                        label = { Text("Nombre") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+
+                    ExposedDropdownMenuBox(
                         expanded = ddExpanded,
-                        onDismissRequest = { ddExpanded = false }
+                        onExpandedChange = { ddExpanded = !ddExpanded }
                     ) {
-                        speciesList.forEach { sp ->
-                            DropdownMenuItem(
-                                text = { Text(sp.display) },
-                                onClick = {
-                                    selectedKey = sp.key ?: ""   // por si sp.key es String?
-                                    ddExpanded = false
-                                }
-                            )
+                        OutlinedTextField(
+                            value = SpeciesDefault.displayFor(selectedKey)
+                                ?: "", // En caso que devuelva un string
+                            onValueChange = {},
+                            readOnly = true,
+                            label = { Text("Tipo de planta") },
+                            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(ddExpanded) },
+                            modifier = Modifier
+                                .menuAnchor()
+                                .fillMaxWidth()
+                        )
+                        ExposedDropdownMenu(
+                            expanded = ddExpanded,
+                            onDismissRequest = { ddExpanded = false }
+                        ) {
+                            speciesList.forEach { sp ->
+                                DropdownMenuItem(
+                                    text = { Text(sp.display) },
+                                    onClick = {
+                                        selectedKey = sp.key ?: ""   // por si sp.key es String?
+                                        ddExpanded = false
+                                    }
+                                )
+                            }
                         }
                     }
-                }
 
-                OutlinedTextField(
-                    value = lastText,
-                    onValueChange = {},
-                    readOnly = true,
-                    label = { Text("Último riego") },
-                    trailingIcon = {
-                        Row {
-                            TextButton(onClick = { pickDate() }) { Text("Fecha") }
-                            TextButton(onClick = { pickTime() }) { Text("Hora") }
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth()
-                )
-            }
-        },
-        confirmButton = {
-            TextButton(
-                onClick = {
-                    // selectedKey es String no-null
-                    onSave(name.trim(), selectedKey, lastMillis)
+                    OutlinedTextField(
+                        value = lastText,
+                        onValueChange = {},
+                        readOnly = true,
+                        label = { Text("Último riego") },
+                        trailingIcon = {
+                            Row {
+                                TextButton(onClick = { pickDate() }) { Text("Fecha") }
+                                TextButton(onClick = { pickTime() }) { Text("Hora") }
+                            }
+                        },
+                        modifier = Modifier.fillMaxWidth()
+                    )
                 }
-            ) { Text("Guardar") }
-        },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
-    )
-}
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        // selectedKey es String no-null
+                        onSave(name.trim(), selectedKey, lastMillis)
+                    }
+                ) { Text("Guardar") }
+            },
+            dismissButton = { TextButton(onClick = onDismiss) { Text("Cancelar") } }
+        )
+    }
 //FINAL DE INTERFAZ PARA EDITAR ITEM
 
-@Preview(showBackground = true)
-@Composable
-fun HomeScreenPreview() {
-    HomeScreen(username = "Paulina Campusano")
-}
+    @Preview(showBackground = true)
+    @Composable
+    fun HomeScreenPreview() {
+        HomeScreen(username = "Paulina Campusano")
+    }
+
