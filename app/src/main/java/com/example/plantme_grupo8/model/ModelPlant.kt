@@ -1,5 +1,9 @@
 package com.example.plantme_grupo8.model
 
+//IMPORTAMOS DEPENDENCIA PARA PODER HACER EL "serializable" DEL MODELO
+import kotlinx.serialization.Serializable
+
+@Serializable
 data class ModelPlant(
     val id: Long,
     val name: String,

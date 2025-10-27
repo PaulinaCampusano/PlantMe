@@ -1,3 +1,5 @@
+//PARA EL DROPMENU SE DEBE DECLARAR QUE SE VA A USAR MATERIAL 3
+@file:OptIn(ExperimentalMaterial3Api::class)
 package com.example.plantme_grupo8.ui.theme.screens
 
 import android.app.DatePickerDialog
@@ -9,10 +11,12 @@ import androidx.compose.material.icons.filled.ArrowDropDown
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.text.input.KeyboardType
+import com.example.plantme_grupo8.ui.theme.utils.Species
 import com.example.plantme_grupo8.ui.theme.utils.SpeciesDefault
 import com.example.plantme_grupo8.viewModel.HomeViewModel
 import java.text.SimpleDateFormat
@@ -27,11 +31,11 @@ fun AddPlantScreen(
     onCancel: () -> Unit = {}
 ) {
     var name by rememberSaveable { mutableStateOf("") }
-    var expanded by remember { mutableStateOf(false) }
+    var expanded by remember { mutableStateOf(false) } // (no se usa; puedes borrarlo si quieres)
 
     // Tipo seleccionado (por defecto el primero)
     val speciesList = SpeciesDefault.list
-    var selectedKey by rememberSaveable { mutableStateOf(speciesList.first().key) }
+    var selectedKey by rememberSaveable { mutableStateOf(speciesList.firstOrNull()?.key ?: "") }
 
     // Último riego (por defecto ahora)
     var lastWateredMillis by rememberSaveable { mutableStateOf(System.currentTimeMillis()) }
@@ -77,11 +81,14 @@ fun AddPlantScreen(
     val lastText = remember(lastWateredMillis) { fmt.format(Date(lastWateredMillis)) }
 
     Column(Modifier.fillMaxSize().padding(16.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
-        Text("Agregar planta", style = MaterialTheme.typography.headlineSmall)
 
-        // Nombre
+        // INICIO TITULO
+        Text("Agregar planta", style = MaterialTheme.typography.headlineSmall)
+        // FIN TITULO
+
+        // INICIO TEXTBOX NOMBRE PLANTA
         OutlinedTextField(
-            value = name,
+            value = name, // <- NECESARIO para que el nombre se edite correctamente
             onValueChange = { name = it; nameError = false },
             label = { Text("Nombre de la planta") },
             singleLine = true,
@@ -89,28 +96,61 @@ fun AddPlantScreen(
             supportingText = { if (nameError) Text("Ingresa un nombre") },
             modifier = Modifier.fillMaxWidth()
         )
+        // FIN TEXTBOX NOMBRE PLANTA
 
-        // Tipo (dropdown)
-        OutlinedTextField(
-            value = SpeciesDefault.displayFor(selectedKey),
-            onValueChange = {},
-            readOnly = true,
-            label = { Text("Tipo de planta") },
-            trailingIcon = { Icon(Icons.Default.ArrowDropDown, contentDescription = null) },
-            modifier = Modifier
-                .fillMaxWidth()
-                .clickable { expanded = true }
-        )
-        DropdownMenu(expanded = expanded, onDismissRequest = { expanded = false }) {
-            speciesList.forEach { sp ->
-                DropdownMenuItem(
-                    text = { Text(sp.display) },
-                    onClick = { selectedKey = sp.key; expanded = false }
+        // INICIO TIPO DE PLANTA
+        @Composable
+        fun SpeciesSelector(
+            speciesList: List<Species>,
+            selectedKey: String,
+            onSelected: (String) -> Unit,
+            modifier: Modifier = Modifier
+        ) {
+            var ddExpanded by rememberSaveable { mutableStateOf(false) }
+
+            ExposedDropdownMenuBox(
+                expanded = ddExpanded,
+                onExpandedChange = { ddExpanded = !ddExpanded },
+                modifier = modifier
+            ) {
+                OutlinedTextField(
+                    value = SpeciesDefault.displayFor(selectedKey),
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Tipo de planta") },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(ddExpanded) },
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth()
                 )
+
+                ExposedDropdownMenu(
+                    expanded = ddExpanded,
+                    onDismissRequest = { ddExpanded = false }
+                ) {
+                    speciesList.forEach { sp ->
+                        DropdownMenuItem(
+                            text = { Text(sp.display) },
+                            onClick = {
+                                onSelected(sp.key)
+                                ddExpanded = false
+                            }
+                        )
+                    }
+                }
             }
         }
 
-        // Último riego (fecha y hora)
+        // llamada al selector (NECESARIA para actualizar selectedKey)
+        SpeciesSelector(
+            speciesList = speciesList,
+            selectedKey = selectedKey,
+            onSelected = { selectedKey = it },
+            modifier = Modifier.fillMaxWidth()
+        )
+        // FINAL TIPO DE PLANTA
+
+        // INICIO ULTIMO RIEGO
         OutlinedTextField(
             value = lastText,
             onValueChange = {},
@@ -126,7 +166,9 @@ fun AddPlantScreen(
         )
 
         Spacer(Modifier.height(8.dp))
+        // FINAL ULTIMO RIEGO
 
+        // INICIO BOTONES CANCELAR Y GUARDAR
         Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
             OutlinedButton(onClick = onCancel, modifier = Modifier.weight(1f)) {
                 Text("Cancelar")
@@ -149,5 +191,6 @@ fun AddPlantScreen(
                 Text("Guardar")
             }
         }
+        // FINAL BOTONES CANCELAR Y GUARDAR
     }
 }
