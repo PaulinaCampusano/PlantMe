@@ -1,5 +1,10 @@
 package com.example.plantme_grupo8.ui.theme.screens
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -29,8 +34,8 @@ import kotlin.math.max
 import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModelStoreOwner
 
-private const val MIN_LOADING_MS = 60L // ⇠ duración mínima visible del loader
-
+ // ⇠ duración mínima visible del loader
+private const val MIN_LOADING_MS = 1200L
 @Composable
 fun LoginScreen(
     vm: AuthViewModel,
@@ -151,16 +156,15 @@ fun LoginScreen(
 
                             try {
                                 vm.login(email, pass)
-                                // pequeño colchón para DataStore u otros side-effects
-                                delay(250)
-                            } finally {
-                                // Si NO se logueó, garantizamos que el loader quede al menos MIN_LOADING_MS
+                                // colchón por si el login es muy rápido
                                 val elapsed = System.currentTimeMillis() - start
-                                val remain = max(0, (MIN_LOADING_MS - elapsed).toInt())
-                                if (!isLogged) {
-                                    if (remain > 0) delay(remain.toLong())
-                                    uiBus.hideLoading()
+                                if (elapsed < MIN_LOADING_MS) {
+                                    delay(MIN_LOADING_MS - elapsed)
                                 }
+                            } catch (t: Throwable) {
+                                // (opcional) log/mostrar error
+                            } finally {
+                                uiBus.hideLoading()   // <-- SIEMPRE lo escondemos
                                 submitting = false
                             }
                         }
@@ -179,6 +183,28 @@ fun LoginScreen(
                 }
             }
         }
+    }
+    var showSuccess by remember { mutableStateOf(false) }
+    LaunchedEffect(isLogged) {
+        if (isLogged) {
+            onLoggedIn()
+            // se muestra un momento y luego navegamos (ya lo haces en LaunchedEffect)
+        }
+    }
+
+    AnimatedVisibility(
+        visible = showSuccess,
+        enter = fadeIn() + expandVertically(),
+        exit = fadeOut() + shrinkVertically()
+    ) {
+        Text(
+            "Sesión iniciada ✔",
+            color = MaterialTheme.colorScheme.primary,
+            style = MaterialTheme.typography.bodyMedium,
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(top = 8.dp)
+        )
     }
 }
 
