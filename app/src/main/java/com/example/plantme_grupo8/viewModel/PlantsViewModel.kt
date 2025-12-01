@@ -176,17 +176,22 @@ class PlantsViewModel(application: Application) : AndroidViewModel(application) 
      * Como implementamos esto en el backend, ¡podemos usarlo!
      */
     fun waterPlant(plant: ModelPlant) {
-        // NOTA: Si en ApiService no pusiste waterPlant, añade la función o usa createPlant como ejemplo.
-        // Si no tienes el endpoint en Retrofit aun, comenta este bloque.
-        /*
         viewModelScope.launch {
-             val authHeader = getAuthHeader() ?: return@launch
-             RetrofitClient.api.waterPlant(authHeader, plant.id) // Necesitas agregar esto a ApiService
-             loadPlantsFromServer() // Recargar para ver la nueva fecha
+            val authHeader = getAuthHeader() ?: return@launch
+
+            try {
+                // LLAMADA AL SERVIDOR
+                val response = RetrofitClient.api.waterPlant(authHeader, plant.id)
+
+                if (response.isSuccessful) {
+                    Log.d("PLANTS_VM", "¡Planta regada!")
+                    // RECARGAMOS LA LISTA para ver la nueva fecha
+                    loadPlantsFromServer()
+                }
+            } catch (e: Exception) {
+                Log.e("PLANTS_VM", "Error al regar: ${e.message}")
+            }
         }
-        */
-        // Por ahora, recargamos para simular
-        loadPlantsFromServer()
     }
 
     // =========================================================================

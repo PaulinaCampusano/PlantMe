@@ -30,6 +30,12 @@ interface ApiService {
     suspend fun getPlants(
         @Header("Authorization") token: String
     ): Response<List<PlantResponse>>
+
+    @retrofit2.http.PUT("api/plantas/{id}/regar")
+    suspend fun waterPlant(
+        @retrofit2.http.Header("Authorization") token: String,
+        @retrofit2.http.Path("id") id: Long
+    ): retrofit2.Response<PlantResponse>
 }
 
 // ==========================================

@@ -7,12 +7,11 @@ object SpeciesDefault {
     private val speciesMap = mapOf(
         "cactus" to "Cactus",
         "suculenta" to "Suculenta",
-        "flor" to "Flor",
-        "helecho" to "Helecho",
-        "monstera" to "Monstera",
+        "aloe" to "aloe",
+        "test" to "test",
         "pothos" to "Pothos",
-        "orquidea" to "Orquídea",
-        "bonsai" to "Bonsái"
+        "sanseviera" to "sanseviera",
+
     )
 
     /**
