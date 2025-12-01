@@ -25,147 +25,189 @@ import kotlinx.coroutines.launch
 import kotlinx.serialization.encodeToString
 import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
+import com.example.plantme_grupo8.api.PlantRequest
+import com.example.plantme_grupo8.api.RetrofitClient
+import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.first
+import java.time.Instant
+import android.util.Log
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.stringPreferencesKey
+import androidx.lifecycle.viewModelScope
+import com.example.plantme_grupo8.data.plantsDataStore
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.update
+import kotlinx.coroutines.launch
+import java.time.ZonedDateTime
 
+// Constantes globales
 private const val DAY_MS = 24 * 60 * 60 * 1000L
+
+// Claves de DataStore
+private val JWT_TOKEN_KEY = stringPreferencesKey("jwt_token")
+private val DUE_IDS_KEY = stringPreferencesKey("due_ids") // Si quisieras persistir notificaciones
 
 class PlantsViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dataStore = application.plantsDataStore
-    private val json = Json { encodeDefaults = true; ignoreUnknownKeys = true }
 
-    private val CURRENT_EMAIL = stringPreferencesKey("current_email")
+    // Constantes de Notificación
+    private val CHANNEL_ID = "channel_riego"
+    private val NOTIF_ID = 101
 
-    // Estado
+    // --- ESTADOS (StateFlow) ---
+
+    // Lista de plantas (viene del Backend)
     private val _plants = MutableStateFlow<List<ModelPlant>>(emptyList())
     val plants: StateFlow<List<ModelPlant>> = _plants.asStateFlow()
 
-    private val _dueIds = MutableStateFlow<Set<Long>>(emptySet())
+    // IDs de plantas que ya necesitan riego (Estado local para no repetir notificaciones)
+    private val _dueIds = MutableStateFlow(emptySet<Long>())
     val dueIds: StateFlow<Set<Long>> = _dueIds.asStateFlow()
-
-    private var currentEmail: String = "guest"
-
-    // Notificaciones
-    private val CHANNEL_ID = "watering_reminders"
 
     init {
         createNotificationChannel()
+        // Cargar plantas del servidor al iniciar la ViewModel
+        loadPlantsFromServer()
+    }
 
-        // Cargar plantas y dueIds reaccionando a cambios de usuario o de preferencias
+    // =========================================================================
+    //              FUNCIONES DE RED (BACKEND)
+    // =========================================================================
+
+    /**
+     * Obtiene el token JWT guardado y le agrega el prefijo "Bearer ".
+     */
+    private suspend fun getAuthHeader(): String? {
+        val preferences = dataStore.data.first()
+        val token = preferences[JWT_TOKEN_KEY]
+        return if (token.isNullOrEmpty()) null else "Bearer $token"
+    }
+
+    /**
+     * Carga la lista de plantas desde Spring Boot (GET /api/plantas)
+     */
+    fun loadPlantsFromServer() {
         viewModelScope.launch {
-            dataStore.data.collect { prefs ->
-                currentEmail = prefs[CURRENT_EMAIL]?.lowercase() ?: "guest"
+            val authHeader = getAuthHeader()
+            if (authHeader == null) {
+                Log.e("PLANTS_VM", "No hay token, no se pueden cargar plantas.")
+                return@launch
+            }
 
-                val plantsKey = stringPreferencesKey("plants_json_$currentEmail")
-                val plantsStr = prefs[plantsKey]
-                _plants.value = plantsStr
-                    ?.let { runCatching { json.decodeFromString<List<ModelPlant>>(it) }.getOrNull() }
-                    ?: emptyList()
+            try {
+                val response = RetrofitClient.api.getPlants(authHeader)
 
-                val dueKey = stringPreferencesKey("due_json_$currentEmail")
-                val dueStr = prefs[dueKey]
-                _dueIds.value = dueStr
-                    ?.let { runCatching { json.decodeFromString<List<Long>>(it) }.getOrNull() }
-                    ?.toSet() ?: emptySet()
+                if (response.isSuccessful && response.body() != null) {
+                    // Mapeamos la respuesta del servidor a nuestro modelo local
+                    val serverPlants = response.body()!!.map { plantRes ->
+                        ModelPlant(
+                            id = plantRes.id,
+                            name = plantRes.nombre,
+                            speciesKey = plantRes.speciesKey,
+
+                            // 1. AÑADIDO: Mapeamos la frecuencia (intervalo)
+                            intervalDays = plantRes.frecuenciaDias,
+
+                            // 2. Fechas convertidas
+                            nextWateringAtMillis = isoStringToMillis(plantRes.siguienteRiego),
+                            lastWateringAtMillis = isoStringToMillis(plantRes.ultimoRiego),
+
+                            // 3. Valores por defecto para la UI
+                            isMarked = false,
+                            isDue = false
+                        )
+                    }
+                    _plants.value = serverPlants
+                    Log.d("PLANTS_VM", "Plantas cargadas: ${serverPlants.size}")
+                } else {
+                    Log.e("PLANTS_VM", "Error cargando plantas: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                Log.e("PLANTS_VM", "Excepción al cargar plantas: ${e.message}")
             }
         }
     }
 
-    // ---------- Persistencia ----------
-    private fun userPlantsKey() = stringPreferencesKey("plants_json_$currentEmail")
-    private fun dueKey()        = stringPreferencesKey("due_json_$currentEmail")
-
-    private suspend fun persist(plants: List<ModelPlant>) {
-        dataStore.edit { it[userPlantsKey()] = json.encodeToString(plants) }
-    }
-    private suspend fun saveDue(set: Set<Long>) {
-        dataStore.edit { it[dueKey()] = json.encodeToString(set.toList()) }
-    }
-
-    // ---------- CRUD ----------
-    private fun nextIdFrom(list: List<ModelPlant>): Long =
-        (list.maxOfOrNull { it.id } ?: 0L) + 1
-
-    fun addPlantAuto(name: String, speciesKey: String, lastWateredAtMillis: Long = System.currentTimeMillis()) {
-        val intervalDays = SpeciesDefault.intervalFor(speciesKey)
-        val next = lastWateredAtMillis + intervalDays * DAY_MS
+    /**
+     * Crea una planta en Spring Boot (POST /api/plantas)
+     */
+    fun createPlant(nombre: String, speciesKey: String, ultimoRiego: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         viewModelScope.launch {
-            val current = plants.value
-            val newPlant = ModelPlant(
-                id = nextIdFrom(current),
-                name = name.trim(),
-                intervalDays = intervalDays,
-                nextWateringAtMillis = next,
-                speciesKey = speciesKey
-            )
-            val updated = current + newPlant
-            persist(updated); _plants.value = updated
-            updateDueFlag(newPlant.id, next)
-        }
-    }
-
-    fun deletePlant(id: Long) {
-        viewModelScope.launch {
-            val updated = plants.value.filterNot { it.id == id }
-            persist(updated); _plants.value = updated
-            val newSet = _dueIds.value - id
-            if (newSet != _dueIds.value) { _dueIds.value = newSet; saveDue(newSet) }
-        }
-    }
-
-    fun updatePlant(id: Long, name: String? = null, speciesKey: String? = null, lastWateredAtMillis: Long? = null) {
-        viewModelScope.launch {
-            val current = plants.value
-            var newNextForId: Long? = null
-            val updated = current.map { p ->
-                if (p.id != id) return@map p
-                val newName = name?.trim()?.takeIf { it.isNotEmpty() } ?: p.name
-                val newSpeciesKey = speciesKey ?: p.speciesKey
-                val newIntervalDays = speciesKey?.let { SpeciesDefault.intervalFor(it) } ?: p.intervalDays
-                val previousLastWatered = p.nextWateringAtMillis - p.intervalDays * DAY_MS
-                val baseLast = lastWateredAtMillis ?: previousLastWatered
-                val newNext = baseLast + newIntervalDays * DAY_MS
-                newNextForId = newNext
-                p.copy(
-                    name = newName,
-                    speciesKey = newSpeciesKey,
-                    intervalDays = newIntervalDays,
-                    nextWateringAtMillis = newNext
-                )
+            val authHeader = getAuthHeader()
+            if (authHeader == null) {
+                onError("Sesión expirada. Reinicia la app.")
+                return@launch
             }
-            persist(updated); _plants.value = updated
-            newNextForId?.let { updateDueFlag(id, it) }
-        }
-    }
 
-    // ---------- Due / Agua ----------
-    private fun updateDueFlag(id: Long, nextMillis: Long) {
-        viewModelScope.launch {
-            val now = System.currentTimeMillis()
-            val newSet = if (nextMillis <= now) _dueIds.value + id else _dueIds.value - id
-            if (newSet != _dueIds.value) { _dueIds.value = newSet; saveDue(newSet) }
-        }
-    }
+            try {
+                val request = PlantRequest(nombre, speciesKey, ultimoRiego)
+                val response = RetrofitClient.api.createPlant(authHeader, request)
 
-    private fun markDue(id: Long) {
-        viewModelScope.launch {
-            val set = _dueIds.value + id
-            _dueIds.value = set; saveDue(set)
-        }
-    }
-
-    fun waterNow(id: Long) {
-        viewModelScope.launch {
-            val now = System.currentTimeMillis()
-            val updated = plants.value.map { p ->
-                if (p.id == id) p.copy(nextWateringAtMillis = now + p.intervalDays * DAY_MS) else p
+                if (response.isSuccessful) {
+                    // Si se creó bien, recargamos la lista completa del servidor
+                    loadPlantsFromServer()
+                    onSuccess()
+                } else {
+                    onError("Error del servidor: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                onError("Error de conexión.")
+                Log.e("PLANTS_VM", "Error createPlant: ${e.message}")
             }
-            persist(updated); _plants.value = updated
-            val set = _dueIds.value - id
-            _dueIds.value = set; saveDue(set)
         }
     }
 
-    // ---------- Notificaciones ----------
+    /**
+     * Eliminar planta (NOTA: Necesitas implementar DELETE en el backend para que esto funcione realmente)
+     * Por ahora, solo simula o podrías implementar el endpoint después.
+     */
+    fun deletePlant(plant: ModelPlant) {
+        // TODO: Implementar endpoint DELETE /api/plantas/{id} en Spring Boot
+        // Por ahora no hace nada para no crashear
+        Log.w("PLANTS_VM", "Borrar planta no implementado en backend aun.")
+    }
+
+    /**
+     * Regar planta (PUT /api/plantas/{id}/regar)
+     * Como implementamos esto en el backend, ¡podemos usarlo!
+     */
+    fun waterPlant(plant: ModelPlant) {
+        // NOTA: Si en ApiService no pusiste waterPlant, añade la función o usa createPlant como ejemplo.
+        // Si no tienes el endpoint en Retrofit aun, comenta este bloque.
+        /*
+        viewModelScope.launch {
+             val authHeader = getAuthHeader() ?: return@launch
+             RetrofitClient.api.waterPlant(authHeader, plant.id) // Necesitas agregar esto a ApiService
+             loadPlantsFromServer() // Recargar para ver la nueva fecha
+        }
+        */
+        // Por ahora, recargamos para simular
+        loadPlantsFromServer()
+    }
+
+    // =========================================================================
+    //              UTILIDADES (FECHAS Y NOTIFICACIONES)
+    // =========================================================================
+
+    /**
+     * Convierte fecha ISO 8601 (String) -> Milisegundos (Long)
+     */
+    private fun isoStringToMillis(isoString: String): Long {
+        return try {
+            val zonedDateTime = ZonedDateTime.parse(isoString)
+            zonedDateTime.toInstant().toEpochMilli()
+        } catch (e: Exception) {
+            Log.e("DateConverter", "Error parseando fecha: $isoString")
+            System.currentTimeMillis() // Fallback a 'ahora' si falla
+        }
+    }
+
+    // --- LÓGICA DE NOTIFICACIONES RECUPERADA ---
+
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val chan = NotificationChannel(
@@ -179,32 +221,50 @@ class PlantsViewModel(application: Application) : AndroidViewModel(application) 
     @SuppressLint("MissingPermission")
     private fun sendDueNotification(plant: ModelPlant) {
         val ctx = getApplication<Application>()
+
+        // Verificación de permiso para Android 13+
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             val granted = ContextCompat.checkSelfPermission(
                 ctx, Manifest.permission.POST_NOTIFICATIONS
             ) == PackageManager.PERMISSION_GRANTED
             if (!granted) return
         }
+
         val label = SpeciesDefault.displayFor(plant.speciesKey ?: "") ?: "planta"
+
         val notif = NotificationCompat.Builder(ctx, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.mipmap.ic_launcher) // Asegúrate de tener este icono
             .setContentTitle("Necesita agua: ${plant.name}")
             .setContentText("La $label necesita ser regada.")
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setAutoCancel(true)
             .build()
+
         NotificationManagerCompat.from(ctx).notify(plant.id.toInt(), notif)
     }
 
-    /** Llama esto periódicamente desde la UI */
+    /**
+     * Escanea las plantas y lanza notificación si nextWatering <= now
+     */
     fun scanAndNotify() {
         val now = System.currentTimeMillis()
         val due = _dueIds.value
         plants.value.forEach { p ->
+            // Si ya pasó la fecha de riego y NO hemos notificado aún
             if (p.nextWateringAtMillis <= now && p.id !in due) {
                 sendDueNotification(p)
                 markDue(p.id)
             }
         }
+    }
+
+    // --- MANEJO DE ESTADO LOCAL DE NOTIFICACIONES ---
+
+    fun markDue(id: Long) {
+        _dueIds.update { it + id }
+    }
+
+    fun unmarkDue(id: Long) {
+        _dueIds.update { it - id }
     }
 }

@@ -6,19 +6,36 @@ import androidx.compose.runtime.getValue
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
-import com.example.plantme_grupo8.ui.theme.screens.*
+import com.example.plantme_grupo8.ui.screens.AccountScreen
+import com.example.plantme_grupo8.ui.screens.AddPlantScreen
+import com.example.plantme_grupo8.ui.screens.HomeScreen
+import com.example.plantme_grupo8.ui.screens.LoginScreen
+import com.example.plantme_grupo8.ui.screens.RegisterScreen
 import com.example.plantme_grupo8.viewModel.AuthViewModel
 import com.example.plantme_grupo8.viewModel.PlantsViewModel
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.navigation.compose.NavHost
+import androidx.navigation.compose.composable
+import com.example.plantme_grupo8.ui.screens.AccountScreen
+import com.example.plantme_grupo8.ui.screens.AddPlantScreen
+import com.example.plantme_grupo8.ui.screens.HomeScreen
+import com.example.plantme_grupo8.ui.screens.LoginScreen
+import com.example.plantme_grupo8.ui.screens.RegisterScreen
+
 
 @Composable
 fun AppNavHost(
     navController: NavHostController,
     authVm: AuthViewModel,
-    plantsVm: PlantsViewModel // ← sin coma final
+    plantsVm: PlantsViewModel
 ) {
-    val logged by authVm.isLoggedIn.collectAsState()
-    val session by authVm.session.collectAsState()
-    val username = session?.name ?: "Invitado"
+    // 1. CORRECCIÓN: Usamos la variable nueva 'isUserLogged'
+    val logged by authVm.isUserLogged.collectAsState()
+
+    // 2. CORRECCIÓN: Quitamos 'session'. Por ahora usaremos un nombre fijo.
+    // (Más adelante podemos guardar el nombre en DataStore si quieres)
+    val username = "Mi Jardín"
 
     if (logged) {
         NavHost(
@@ -26,27 +43,25 @@ fun AppNavHost(
             startDestination = AppRoute.Home.route
         ) {
             composable(AppRoute.Home.route) {
-                HomeScreen(username = username, vm = plantsVm) // pasa PlantsViewModel
+                // Aquí pasamos el username fijo
+                HomeScreen(username = username, vm = plantsVm)
             }
+
+            // Ruta para agregar planta
             composable(AppRoute.Add.route) {
                 AddPlantScreen(
-                    homeVm = plantsVm,
-                    onSaved = {
-                        navController.navigate(AppRoute.Home.route) {
-                            popUpTo(AppRoute.Home.route) { saveState = true }
-                            launchSingleTop = true
-                            restoreState = true
-                        }
-                    },
-                    onCancel = { navController.popBackStack() }
+                    vm = plantsVm,
+                    onBack = { navController.popBackStack() }
                 )
             }
+
             composable(AppRoute.Account.route) {
                 AccountScreen(
                     username = username,
-                    homeVm = plantsVm,
+                    homeVm = plantsVm, // Nota: AccountScreen pedía homeVm, le pasamos plantsVm si es compatible
                     onLogout = { authVm.logout() },
-                    onDeleteAccount = { authVm.deleteLocalAccount() }
+                    // Eliminamos deleteLocalAccount porque ahora es todo remoto
+                    onDeleteAccount = { authVm.logout() }
                 )
             }
         }
@@ -60,6 +75,7 @@ fun AppNavHost(
                     vm = authVm,
                     onGoRegister = { navController.navigate(AppRoute.Register.route) },
                     onLoggedIn = {
+                        // Al loguearse, vamos al Home y borramos el historial de atrás
                         navController.navigate(AppRoute.Home.route) {
                             popUpTo(0) { inclusive = true }
                         }
@@ -70,6 +86,7 @@ fun AppNavHost(
                 RegisterScreen(
                     vm = authVm,
                     onRegistered = {
+                        // Al registrarse, vamos al Home
                         navController.navigate(AppRoute.Home.route) {
                             popUpTo(0) { inclusive = true }
                         }

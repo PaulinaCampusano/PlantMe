@@ -1,21 +1,32 @@
 package com.example.plantme_grupo8.ui.theme.utils
 
 
-data class Species(val key: String, val display: String, val intervalDays: Int)
-
 object SpeciesDefault {
-    val list = listOf(
-        Species("cactus",       "Cactus",       30),
-        Species("pothos",       "Pothos",        7),
-        Species("aloe",         "Aloe",         14),
-        Species("sansevieria",  "Sansevieria",  18),
-        Species("suculenta",    "Suculenta",    21),
-        Species("test",    "Test",    1)
+
+    // Mapa que asocia: "clave_para_backend" -> "Nombre Bonito en Pantalla"
+    private val speciesMap = mapOf(
+        "cactus" to "Cactus",
+        "suculenta" to "Suculenta",
+        "flor" to "Flor",
+        "helecho" to "Helecho",
+        "monstera" to "Monstera",
+        "pothos" to "Pothos",
+        "orquidea" to "Orquídea",
+        "bonsai" to "Bonsái"
     )
 
-    fun intervalFor(key: String): Int =
-        list.firstOrNull { it.key == key }?.intervalDays ?: 7
+    /**
+     * Devuelve todas las claves (ej: ["cactus", "suculenta", ...])
+     * Esto es lo que necesitas para el Dropdown.
+     */
+    fun getAllKeys(): List<String> {
+        return speciesMap.keys.toList().sorted()
+    }
 
-    fun displayFor(key: String): String =
-        list.firstOrNull { it.key == key }?.display ?: key
+    /**
+     * Dado una clave ("cactus"), devuelve el nombre bonito ("Cactus").
+     */
+    fun displayFor(key: String): String? {
+        return speciesMap[key]
+    }
 }

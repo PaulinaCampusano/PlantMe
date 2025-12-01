@@ -1,4 +1,4 @@
-package com.example.plantme_grupo8.ui.theme.screens
+package com.example.plantme_grupo8.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
