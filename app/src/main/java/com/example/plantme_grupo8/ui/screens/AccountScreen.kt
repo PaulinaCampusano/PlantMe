@@ -49,7 +49,7 @@ fun AccountScreen(
             )
         ) { Text("Cerrar sesión") }
 
-        
+
     }
 }
 
