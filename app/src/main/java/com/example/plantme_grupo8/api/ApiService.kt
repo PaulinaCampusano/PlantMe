@@ -6,7 +6,9 @@ import retrofit2.http.Body
 import retrofit2.http.GET
 import retrofit2.http.Header
 import retrofit2.http.POST
-
+import com.google.gson.annotations.SerializedName
+import com.google.gson.GsonBuilder
+import retrofit2.http.*
 // ==========================================
 // 1. INTERFAZ DE LA API (Los Endpoints)
 // ==========================================
@@ -30,6 +32,14 @@ interface ApiService {
     suspend fun getPlants(
         @Header("Authorization") token: String
     ): Response<List<PlantResponse>>
+
+    // ACTUALIZAR/EDITAR una planta existente
+    @PUT("api/plantas/{id}")
+    suspend fun updatePlant(
+        @Header("Authorization") token: String,
+        @Path("id") id: Long,
+        @Body request: PlantRequest
+    ): Response<PlantResponse>
 
     @retrofit2.http.PUT("api/plantas/{id}/regar")
     suspend fun waterPlant(
@@ -73,6 +83,7 @@ data class JwtResponse(
 
 // Registro
 data class RegisterRequest(
+    @SerializedName("username")
     val nombre: String,
     val email: String,
     val password: String
@@ -80,6 +91,7 @@ data class RegisterRequest(
 
 // Plantas (Lo que te daba error)
 data class PlantRequest(
+
     val nombre: String,
     val speciesKey: String,
     val ultimoRiego: String

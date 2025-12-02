@@ -43,6 +43,10 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.time.ZonedDateTime
 
+import java.time.ZoneId
+import java.time.format.DateTimeFormatter // Necesario para formatear fechas a String ISO
+
+
 // Constantes globales
 private const val DAY_MS = 24 * 60 * 60 * 1000L
 
@@ -200,16 +204,103 @@ class PlantsViewModel(application: Application) : AndroidViewModel(application) 
 
     /**
      * Convierte fecha ISO 8601 (String) -> Milisegundos (Long)
+     * Esta función maneja la conversión de fechas que vienen de la API al formato Long (milisegundos)
      */
     private fun isoStringToMillis(isoString: String): Long {
         return try {
-            val zonedDateTime = ZonedDateTime.parse(isoString)
-            zonedDateTime.toInstant().toEpochMilli()
+            // Caso 1: Viene con Zona (ej: 2025-12-01T10:00:00Z)
+            if (isoString.contains("Z") || isoString.contains("+")) {
+                java.time.ZonedDateTime.parse(isoString).toInstant().toEpochMilli()
+            } else {
+                // Caso 2: Viene limpia (ej: 2025-12-01T10:00:00) -> Usamos la zona del celular
+                java.time.LocalDateTime.parse(isoString)
+                    .atZone(java.time.ZoneId.systemDefault())
+                    .toInstant()
+                    .toEpochMilli()
+            }
         } catch (e: Exception) {
-            Log.e("DateConverter", "Error parseando fecha: $isoString")
-            System.currentTimeMillis() // Fallback a 'ahora' si falla
+            Log.e("DateConverter", "Error leyendo fecha: $isoString")
+            // Si falla, devolvemos 'mañana' para que no salga "Atrasado" y sepas que hubo error
+            System.currentTimeMillis() + 86400000L
         }
     }
+
+    /** * Convierte Milisegundos (Long) -> Fecha ISO 8601 (String)
+     * ESTA FALTABA: Convierte la fecha seleccionada en la UI al formato que espera el Backend
+     */
+    private fun isoStringFromMillis(millis: Long): String {
+        return try {
+            Instant.ofEpochMilli(millis)
+                .atZone(ZoneId.systemDefault())
+                // Usamos un formato estándar ISO 8601 para el Backend (sin microsegundos)
+                .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"))
+        } catch (e: Exception) {
+            Log.e("DateConverter", "Error formateando fecha: $millis, ${e.message}")
+            // Devuelve la fecha actual con el formato ISO si hay error
+            java.time.ZonedDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
+        }
+    }
+
+
+    /** 🆕 ACTUALIZAR PLANTA (Nombre, Especie, Último Riego) */
+    fun updatePlant(
+        plantId: Long,
+        name: String,
+        speciesKey: String,
+        lastWateredAtMillis: Long // Fecha de último riego seleccionada en el diálogo
+    ) = viewModelScope.launch {
+        // CORRECCIÓN: Usamos la nueva función auxiliar para formatear la fecha a String ISO
+        val ultimoRiegoISO = isoStringFromMillis(lastWateredAtMillis)
+
+        val authHeader = getAuthHeader() ?: return@launch
+
+        val request = PlantRequest(
+            nombre = name,
+            speciesKey = speciesKey,
+            ultimoRiego = ultimoRiegoISO // Usamos el String ISO formateado
+        )
+
+        try {
+            // 2. Llamar al endpoint PUT
+            // NOTA: Asumo que en el ApiService creaste: suspend fun updatePlant(token: String, @Path("id") id: Long, @Body request: PlantRequest): Response<PlantResponse>
+            val response = RetrofitClient.api.updatePlant(authHeader, plantId, request)
+
+            if (response.isSuccessful && response.body() != null) {
+                val responseDTO = response.body()!!
+
+                // 3. Convertir DTO a Modelo local (ModelPlant)
+                val newPlant = ModelPlant(
+                    id = responseDTO.id,
+                    name = responseDTO.nombre,
+                    // Usamos la frecuencia devuelta por el Backend
+                    intervalDays = responseDTO.frecuenciaDias,
+                    // Recalculamos el siguiente riego en milisegundos para la UI
+                    nextWateringAtMillis = isoStringToMillis(responseDTO.siguienteRiego),
+                    lastWateringAtMillis = isoStringToMillis(responseDTO.ultimoRiego),
+                    speciesKey = responseDTO.speciesKey,
+                    isMarked = false,
+                    isDue = false
+                )
+
+                // 4. Actualizar la lista de plantas localmente
+                val updatedList = _plants.value.map { plant ->
+                    if (plant.id == plantId) newPlant else plant
+                }
+                _plants.value = updatedList // Actualizamos el StateFlow de plantas
+
+                // Si se actualizó el riego, limpiamos la notificación pendiente
+                unmarkDue(plantId)
+
+            } else {
+                Log.e("PLANTS_VM", "Error respuesta al actualizar: ${response.code()}")
+            }
+
+        } catch (e: Exception) {
+            Log.e("PLANTS_VM", "Excepción al actualizar planta ${plantId}: ${e.message}")
+            // Manejo de error
+        }
+    }
+
 
     // --- LÓGICA DE NOTIFICACIONES RECUPERADA ---
 

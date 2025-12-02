@@ -33,33 +33,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import java.util.Calendar
-import java.util.Date
-import java.util.Locale
-import androidx.activity.compose.rememberLauncherForActivityResult
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.outlined.Face
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.ui.draw.clip
-
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
-
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-
 
 import java.util.*
 import android.Manifest
@@ -71,39 +46,29 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.DrawableRes
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
+
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
-import androidx.compose.material.icons.outlined.Face
-import androidx.compose.material.icons.outlined.Notifications
-import androidx.compose.material.icons.outlined.WaterDrop
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
+
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
+
 import com.example.plantme_grupo8.R
 import com.example.plantme_grupo8.model.ModelPlant
 import com.example.plantme_grupo8.ui.theme.utils.SpeciesDefault
+import com.example.plantme_grupo8.ui.theme.utils.SpeciesDefault.getAllKeys
 import com.example.plantme_grupo8.viewModel.PlantsViewModel
-import java.text.SimpleDateFormat
-import java.util.*
-import kotlin.math.ceil
-
+import kotlinx.coroutines.delay
+import java.util.concurrent.TimeUnit
+import kotlin.math.abs
+import com.example.plantme_grupo8.ui.theme.utils.SpeciesDefault.getAllSpecies
+import com.example.plantme_grupo8.ui.theme.utils.SpeciesDefault.displayFor
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -112,10 +77,12 @@ fun HomeScreen(
     @DrawableRes photoRes: Int? = R.drawable.backagroudhs
 ) {
     val plants by vm.plants.collectAsState()
-    // val dueIds by vm.dueIds.collectAsState() // Ya no necesitamos esto para el color, usaremos la fecha real
     val context = LocalContext.current
 
-    // Permisos de Notificación
+    // ESTADO PARA EL DIÁLOGO DE EDICIÓN
+    var plantToEdit by remember { mutableStateOf<ModelPlant?>(null) }
+    var plantToDelete by remember { mutableStateOf<ModelPlant?>(null) }
+
     val requestPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission(),
         onResult = { }
@@ -127,7 +94,8 @@ fun HomeScreen(
                 requestPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
             }
         }
-        vm.loadPlantsFromServer() // Cargar lista al abrir
+        vm.loadPlantsFromServer()
+        vm.scanAndNotify()
     }
 
     Scaffold(
@@ -147,14 +115,12 @@ fun HomeScreen(
     ) { innerPadding ->
 
         Box(modifier = Modifier.fillMaxSize()) {
-            // Fondo
             if (photoRes != null) {
                 Image(painter = painterResource(id = photoRes), contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
             } else {
                 Box(Modifier.fillMaxSize().background(Color(0xFF2D3B2D)))
             }
 
-            // Lista
             if (plants.isEmpty()) {
                 Box(modifier = Modifier.fillMaxSize().padding(innerPadding), contentAlignment = Alignment.Center) {
                     Text("No tienes plantas aún.\n¡Agrega una nueva!", color = Color.White, style = MaterialTheme.typography.bodyLarge)
@@ -165,12 +131,16 @@ fun HomeScreen(
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item { Spacer(modifier = Modifier.height(8.dp)) }
-                    items(plants) { plant ->
-                        PlantItem(
+
+                    items(
+                        items = plants,
+                        key = { it.id }
+                    ) { plant ->
+                        PlantItemWithTimer(
                             plant = plant,
-                            onWater = { vm.waterPlant(plant) }, // Llama al backend
-                            onEdit = { Toast.makeText(context, "Editar próximamente", Toast.LENGTH_SHORT).show() },
-                            onDelete = { vm.deletePlant(plant) }
+                            onWater = { vm.waterPlant(plant) },
+                            onEdit = { plantToEdit = plant },
+                            onDelete = { plantToDelete = plant }
                         )
                     }
                     item { Spacer(modifier = Modifier.height(80.dp)) }
@@ -178,33 +148,67 @@ fun HomeScreen(
             }
         }
     }
+
+    // DIÁLOGO DE EDICIÓN
+    // ... dentro de HomeScreen
+    plantToEdit?.let { plant ->
+        EditPlantDialog(
+            plant = plant,
+            // AQUI faltaba el vm = vm
+            onSave = { name, speciesKey, lastWateredMillis ->
+                vm.updatePlant(plant.id, name, speciesKey, lastWateredMillis)
+                // Cierra el diálogo después de guardar
+                plantToEdit = null
+            },
+            onDismiss = {
+                // Cierra el diálogo si se cancela
+                plantToEdit = null
+            }
+        )
+    }
+// ...
+
+    // DIÁLOGO DE ELIMINAR
+    plantToDelete?.let { plant ->
+        AlertDialog(
+            onDismissRequest = { plantToDelete = null },
+            title = { Text("Eliminar Planta") },
+            text = { Text("¿Estás seguro de que deseas eliminar a ${plant.name}?") },
+            confirmButton = {
+                TextButton(onClick = {
+                    vm.deletePlant(plant)
+                    plantToDelete = null
+                }) {
+                    Text("Eliminar", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { plantToDelete = null }) { Text("Cancelar") }
+            }
+        )
+    }
 }
 
 @Composable
-fun PlantItem(
+fun PlantItemWithTimer(
     plant: ModelPlant,
     onWater: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    // --- LÓGICA DE FECHAS NUEVA (Cuenta atrás) ---
-    val now = System.currentTimeMillis()
-    val diffMillis = plant.nextWateringAtMillis - now
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
 
-    // Convertimos a días (redondeando hacia arriba)
-    val daysLeft = ceil(diffMillis / (1000.0 * 60 * 60 * 24)).toInt()
-
-    val statusText = when {
-        daysLeft < 0 -> "¡Atrasado ${Math.abs(daysLeft)} días!"
-        daysLeft == 0 -> "¡Hoy toca riego!"
-        daysLeft == 1 -> "Riego mañana"
-        else -> "Riego en $daysLeft días"
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000L)
+            now = System.currentTimeMillis()
+        }
     }
 
-    // Rojo si es hoy o antes, Verde si falta
-    val isDue = daysLeft <= 0
+    val diff = plant.nextWateringAtMillis - now
+    val isDue = diff <= 0
+    val statusText = formatDuration(diff)
     val statusColor = if (isDue) Color.Red else Color(0xFF4CAF50)
-
     val speciesName = SpeciesDefault.displayFor(plant.speciesKey ?: "") ?: plant.speciesKey ?: "Planta"
 
     Card(
@@ -217,7 +221,6 @@ fun PlantItem(
             modifier = Modifier.padding(16.dp).fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Gota de agua
             Box(
                 contentAlignment = Alignment.Center,
                 modifier = Modifier
@@ -235,33 +238,182 @@ fun PlantItem(
 
             Spacer(modifier = Modifier.width(16.dp))
 
-            // Información
             Column(modifier = Modifier.weight(1f)) {
                 Text(text = plant.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
                 Text(text = speciesName, style = MaterialTheme.typography.bodySmall, color = Color.Gray)
-
-                // AQUÍ MUESTRA "Riego en X días"
                 Text(
-                    text = statusText,
+                    text = if (isDue) "¡Necesita Riego!" else statusText,
                     style = MaterialTheme.typography.labelSmall,
                     color = statusColor,
                     fontWeight = FontWeight.Bold
                 )
             }
 
-            // Botones
             Row {
-                IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, null, tint = Color.Gray) }
-                IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, null, tint = Color.Gray) }
-
-                // BOTÓN REGAR
+                IconButton(onClick = onEdit) { Icon(Icons.Filled.Edit, "Editar", tint = Color.Gray) }
+                IconButton(onClick = onDelete) { Icon(Icons.Filled.Delete, "Eliminar", tint = Color.Gray) }
                 FilledIconButton(
                     onClick = onWater,
                     colors = IconButtonDefaults.filledIconButtonColors(containerColor = Color(0xFF4CAF50))
                 ) {
-                    Icon(Icons.Outlined.WaterDrop, null, tint = Color.White)
+                    Icon(Icons.Outlined.WaterDrop, "Regar", tint = Color.White)
                 }
             }
         }
+    }
+}
+
+// ====================================================================================
+// COMPONENTE CORREGIDO: DIÁLOGO DE EDICIÓN DE PLANTA
+// ====================================================================================
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun EditPlantDialog(
+    plant: ModelPlant,
+    onSave: (name: String, speciesKey: String, lastWateredMillis: Long) -> Unit,
+    onDismiss: () -> Unit
+) {
+    val context = LocalContext.current
+
+    // 1. OBTENEMOS LA LISTA DE CLAVES (List<String>)
+    val speciesKeys = SpeciesDefault.getAllKeys()
+
+    var name by rememberSaveable { mutableStateOf(plant.name) }
+    var selectedKey by rememberSaveable { mutableStateOf(plant.speciesKey) }
+    var lastWateredMillis by rememberSaveable { mutableStateOf(plant.lastWateringAtMillis) }
+    var expanded by remember { mutableStateOf(false) }
+    var nameError by remember { mutableStateOf(false) }
+
+    val pickDate: () -> Unit = {
+        val calendar = Calendar.getInstance().apply { timeInMillis = lastWateredMillis }
+        DatePickerDialog(
+            context,
+            { _, year, month, day ->
+                calendar.set(year, month, day)
+                val currentHour = Calendar.getInstance().apply { timeInMillis = lastWateredMillis }.get(Calendar.HOUR_OF_DAY)
+                val currentMinute = Calendar.getInstance().apply { timeInMillis = lastWateredMillis }.get(Calendar.MINUTE)
+                calendar.set(Calendar.HOUR_OF_DAY, currentHour)
+                calendar.set(Calendar.MINUTE, currentMinute)
+                lastWateredMillis = calendar.timeInMillis
+            },
+            calendar.get(Calendar.YEAR),
+            calendar.get(Calendar.MONTH),
+            calendar.get(Calendar.DAY_OF_MONTH)
+        ).show()
+    }
+
+    val pickTime: () -> Unit = {
+        val calendar = Calendar.getInstance().apply { timeInMillis = lastWateredMillis }
+        TimePickerDialog(
+            context,
+            { _, hour, minute ->
+                calendar.set(Calendar.HOUR_OF_DAY, hour)
+                calendar.set(Calendar.MINUTE, minute)
+                lastWateredMillis = calendar.timeInMillis
+            },
+            calendar.get(Calendar.HOUR_OF_DAY),
+            calendar.get(Calendar.MINUTE),
+            true
+        ).show()
+    }
+
+    val lastText by remember(lastWateredMillis) {
+        mutableStateOf(
+            java.text.SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()).format(Date(lastWateredMillis))
+        )
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Editar Planta: ${plant.name}") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it },
+                    label = { Text("Nombre de la planta") },
+                    isError = nameError,
+                    supportingText = { if (nameError) Text("El nombre no puede estar vacío") },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                ExposedDropdownMenuBox(
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded },
+                    modifier = Modifier.fillMaxWidth() // Quitamos .menuAnchor() de aquí si da problemas de versión
+                ) {
+                    val displayedSpeciesName = SpeciesDefault.displayFor(selectedKey ?: "") ?: selectedKey ?: ""
+
+                    OutlinedTextField(
+                        value = displayedSpeciesName,
+                        onValueChange = {},
+                        readOnly = true,
+                        trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = expanded) },
+                        label = { Text("Especie") },
+                        modifier = Modifier.menuAnchor().fillMaxWidth()
+                    )
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
+                    ) {
+                        // FIX: Iteramos sobre la LISTA de keys
+                        speciesKeys.forEach { key ->
+                            val displayName = SpeciesDefault.displayFor(key) ?: key
+                            DropdownMenuItem(
+                                text = { Text(displayName) },
+                                onClick = {
+                                    selectedKey = key
+                                    expanded = false
+                                }
+                            )
+                        }
+                    }
+                }
+
+                OutlinedTextField(
+                    value = lastText,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text("Último riego") },
+                    trailingIcon = {
+                        Row {
+                            TextButton(onClick = { pickDate() }) { Text("Fecha") }
+                            TextButton(onClick = { pickTime() }) { Text("Hora") }
+                        }
+                    },
+                    modifier = Modifier.fillMaxWidth()
+                )
+            }
+        },
+        confirmButton = {
+            TextButton(
+                onClick = {
+                    nameError = name.isBlank()
+                    if (!nameError) {
+                        onSave(name.trim(), selectedKey.orEmpty(), lastWateredMillis)
+                    }
+                }
+            ) { Text("Guardar") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancelar") }
+        }
+    )
+}
+
+fun formatDuration(diffMillis: Long): String {
+    val absDiff = abs(diffMillis)
+    val days = TimeUnit.MILLISECONDS.toDays(absDiff)
+    val hours = TimeUnit.MILLISECONDS.toHours(absDiff) % 24
+    val minutes = TimeUnit.MILLISECONDS.toMinutes(absDiff) % 60
+    val seconds = TimeUnit.MILLISECONDS.toSeconds(absDiff) % 60
+
+    return if (diffMillis > 0) {
+        if (days > 0) "Riego en ${days}d ${hours}h ${minutes}m"
+        else if (hours > 0) "Riego en ${hours}h ${minutes}m ${seconds}s"
+        else "Riego en ${minutes}m ${seconds}s"
+    } else {
+        if (days > 0) "¡Atrasado por ${days}d ${hours}h!"
+        else "¡Atrasado por ${hours}h ${minutes}m ${seconds}s!"
     }
 }

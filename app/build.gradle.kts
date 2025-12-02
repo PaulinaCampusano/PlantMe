@@ -67,7 +67,8 @@ dependencies {
     implementation(libs.androidx.lifecycle.viewmodel.ktx)  // viewModelScope
     implementation(libs.kotlinx.coroutines.android)        // (recomendado)
     implementation(libs.androidx.lifecycle.runtime.compose)
-    implementation(libs.androidx.compose.foundation) // (opcional para collectAsStateWithLifecycle)
+    implementation(libs.androidx.compose.foundation)
+    implementation(libs.androidx.compose.runtime.saveable) // (opcional para collectAsStateWithLifecycle)
     // =====================================================
 
     testImplementation(libs.junit)

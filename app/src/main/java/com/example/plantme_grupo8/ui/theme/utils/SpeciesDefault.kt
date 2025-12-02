@@ -1,6 +1,5 @@
 package com.example.plantme_grupo8.ui.theme.utils
 
-
 object SpeciesDefault {
 
     // Mapa que asocia: "clave_para_backend" -> "Nombre Bonito en Pantalla"
@@ -12,11 +11,18 @@ object SpeciesDefault {
         "pothos" to "Pothos",
         "sanseviera" to "sanseviera",
 
-    )
+        )
+
+    /**
+     * Devuelve el mapa completo de especies (clave -> nombre visible).
+     * Esta función es necesaria para la iteración clave-valor en la UI (HomeScreen).
+     */
+    fun getAllSpecies(): Map<String, String> {
+        return speciesMap
+    }
 
     /**
      * Devuelve todas las claves (ej: ["cactus", "suculenta", ...])
-     * Esto es lo que necesitas para el Dropdown.
      */
     fun getAllKeys(): List<String> {
         return speciesMap.keys.toList().sorted()
