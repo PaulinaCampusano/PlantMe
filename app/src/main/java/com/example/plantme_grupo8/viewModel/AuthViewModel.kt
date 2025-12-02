@@ -17,31 +17,63 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
-// Clave donde guardaremos el Token JWT
+
+// Claves de DataStore
 private val JWT_TOKEN_KEY = stringPreferencesKey("jwt_token")
+private val USER_NAME_KEY = stringPreferencesKey("user_name_display") // Para guardar el nombre/email
 
 class AuthViewModel(application: Application) : AndroidViewModel(application) {
 
     private val dataStore = application.plantsDataStore
 
-    // Estado para saber si estamos cargando (para mostrar un spinner en la UI)
+    // --- ESTADOS ---
+
+    // 1. Estado de carga (Spinner)
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading.asStateFlow()
 
-    // Estado para saber si el usuario está logueado (Si hay token, es true)
-    val isUserLogged: StateFlow<Boolean> = dataStore.data
-        .map { preferences ->
-            val token = preferences[JWT_TOKEN_KEY]
-            !token.isNullOrEmpty() // Devuelve true si hay token
+    // 2. Estado de Login (True si hay token)
+    private val _isLoggedInternal = MutableStateFlow(false)
+    // Exponemos esta para que AppNavHost la lea.
+    // NOTA: Si en AppNavHost usas "isUserLogged", cambia el nombre aquí o allá.
+    // Para compatibilidad con tu código anterior, la llamaremos isUserLoggedFlow
+    val isUserLoggedFlow: StateFlow<Boolean> = _isLoggedInternal.asStateFlow()
+
+    // 3. Estado del Nombre de Usuario (Para el "Hola, Usuario")
+    private val _usernameFlow = MutableStateFlow("Mi Jardín")
+    val usernameFlow: StateFlow<String> = _usernameFlow.asStateFlow()
+
+    init {
+        // Al iniciar la App, verificamos si ya hay sesión guardada y recuperamos el nombre
+        viewModelScope.launch {
+            dataStore.data.collect { preferences ->
+                val token = preferences[JWT_TOKEN_KEY]
+                val savedName = preferences[USER_NAME_KEY]
+
+                // Actualizamos estado de login
+                _isLoggedInternal.value = !token.isNullOrEmpty()
+
+                // Actualizamos nombre si existe, sino "Mi Jardín"
+                if (!savedName.isNullOrEmpty()) {
+                    _usernameFlow.value = savedName
+                } else {
+                    _usernameFlow.value = "usuario"
+                }
+            }
         }
-        .stateIn(viewModelScope, kotlinx.coroutines.flow.SharingStarted.Eagerly, false)
+    }
 
     /**
      * LOGIN: Envía email/pass al servidor Spring Boot
      */
     fun login(email: String, password: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        val e = email.trim().lowercase()
+        val e = email.trim() // Quitamos lowercase forzado por si acaso
         val p = password.trim()
 
         if (e.isEmpty() || p.isEmpty()) {
@@ -56,22 +88,28 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val response = RetrofitClient.api.login(LoginRequest(e, p))
 
                 if (response.isSuccessful && response.body() != null) {
-                    // 2. ¡Éxito! Obtenemos el token
                     val token = response.body()!!.token
-                    Log.d("AUTH", "Login exitoso. Token: $token")
+                    Log.d("AUTH", "Login exitoso. Token recibido.")
 
-                    // 3. Guardamos el token en DataStore (El celular lo recuerda)
+                    // 2. Extraer nombre para mostrar (Usamos la parte antes del @ del email)
+                    val displayName = e.substringBefore("@")
+
+                    // 3. Guardar Token y Nombre en DataStore
                     dataStore.edit { preferences ->
                         preferences[JWT_TOKEN_KEY] = token
+                        preferences[USER_NAME_KEY] = displayName
                     }
+
+                    // 4. IMPORTANTE: Actualizar estados locales inmediatamente para la UI
+                    _usernameFlow.value = displayName
+                    _isLoggedInternal.value = true
+
                     onSuccess()
                 } else {
-                    // Error 401, 404, etc.
                     Log.e("AUTH", "Error login: ${response.code()}")
                     onError("Credenciales incorrectas")
                 }
             } catch (ex: Exception) {
-                // Error de conexión (Servidor apagado, sin internet)
                 Log.e("AUTH", "Excepción login: ${ex.message}")
                 onError("Error de conexión con el servidor")
             } finally {
@@ -85,7 +123,7 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
      */
     fun register(name: String, email: String, password: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
         val n = name.trim()
-        val e = email.trim().lowercase()
+        val e = email.trim()
         val p = password.trim()
 
         if (n.isEmpty() || e.isEmpty() || p.isEmpty()) {
@@ -100,13 +138,13 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
                 val response = RetrofitClient.api.register(RegisterRequest(n, e, p))
 
                 if (response.isSuccessful) {
-                    // 2. Éxito (201 Created)
                     Log.d("AUTH", "Registro exitoso")
-                    // Opcional: Podrías hacer login automático aquí si quisieras
+
+                    // Opcional: Podrías hacer login automático aquí o guardar el nombre
+                    // Por ahora, solo notificamos éxito
                     onSuccess()
                 } else {
-                    // Error (ej: Email ya existe - 409 Conflict)
-                    val errorMsg = if (response.code() == 409) "El email ya está registrado" else "Error al registrarse"
+                    val errorMsg = if (response.code() == 409) "El email ya está registrado" else "Error al registrarse (${response.code()})"
                     onError(errorMsg)
                 }
             } catch (ex: Exception) {
@@ -118,14 +156,18 @@ class AuthViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     /**
-     * LOGOUT: Simplemente borramos el token del celular
+     * LOGOUT: Borramos token y datos locales
      */
     fun logout() {
         viewModelScope.launch {
+            // Borrar de DataStore
             dataStore.edit { preferences ->
                 preferences.remove(JWT_TOKEN_KEY)
+                preferences.remove(USER_NAME_KEY)
             }
+            // Resetear estados en memoria
+            _isLoggedInternal.value = false
+            _usernameFlow.value = "Mi Jardín"
         }
     }
-
 }

@@ -5,11 +5,11 @@ object SpeciesDefault {
     // Mapa que asocia: "clave_para_backend" -> "Nombre Bonito en Pantalla"
     private val speciesMap = mapOf(
         "cactus" to "Cactus",
-        "suculenta" to "Suculenta",
+        "suculenta" to "suculenta",
         "aloe" to "aloe",
         "test" to "test",
-        "pothos" to "Pothos",
-        "sanseviera" to "sanseviera",
+        "pothos" to "pothos",
+        "sansevieria" to "sansevieria",
 
         )
 

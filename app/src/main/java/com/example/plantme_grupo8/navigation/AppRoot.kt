@@ -30,7 +30,7 @@ fun AppRoot(@DrawableRes photoRes: Int? = R.drawable.backagroudhs) {
     val plantsVm: PlantsViewModel = viewModel()
     val uiBus: UiBusViewModel = viewModel()
 
-    val logged by authVm.isUserLogged.collectAsState()
+    val logged by authVm.isUserLoggedFlow.collectAsState()
     val loading by uiBus.isLoading.collectAsState()
 
     Scaffold(

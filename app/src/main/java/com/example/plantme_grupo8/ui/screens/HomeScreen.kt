@@ -104,7 +104,7 @@ fun HomeScreen(
                 title = {
                     Column {
                         Text("Hola, $username", style = MaterialTheme.typography.titleMedium, color = Color.White)
-                        Text("Mis Plantas", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
+                        Text("Mi Jardín", style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold, color = Color.White)
                     }
                 },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = Color.Transparent)

@@ -31,11 +31,9 @@ fun AppNavHost(
     plantsVm: PlantsViewModel
 ) {
     // 1. CORRECCIÓN: Usamos la variable nueva 'isUserLogged'
-    val logged by authVm.isUserLogged.collectAsState()
+    val logged by authVm.isUserLoggedFlow.collectAsState()
 
-    // 2. CORRECCIÓN: Quitamos 'session'. Por ahora usaremos un nombre fijo.
-    // (Más adelante podemos guardar el nombre en DataStore si quieres)
-    val username = "Mi Jardín"
+    val username by authVm.usernameFlow.collectAsState()
 
     if (logged) {
         NavHost(
