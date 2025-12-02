@@ -49,16 +49,7 @@ fun AccountScreen(
             )
         ) { Text("Cerrar sesión") }
 
-        Button(
-            onClick = onDeleteAccount,  // ⬅️ usa callback
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 8.dp),
-            colors = ButtonDefaults.buttonColors(
-                containerColor = MaterialTheme.colorScheme.error,
-                contentColor = MaterialTheme.colorScheme.onError
-            )
-        ) { Text("Eliminar cuenta") }
+        
     }
 }
 
