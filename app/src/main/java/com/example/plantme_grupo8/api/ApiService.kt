@@ -41,6 +41,12 @@ interface ApiService {
         @Body request: PlantRequest
     ): Response<PlantResponse>
 
+    @DELETE("api/plantas/{id}")
+    suspend fun deletePlant(
+        @Header("Authorization") token: String,
+        @Path("id") plantId: Long
+    ): Response<Void>
+
     @retrofit2.http.PUT("api/plantas/{id}/regar")
     suspend fun waterPlant(
         @retrofit2.http.Header("Authorization") token: String,
@@ -52,9 +58,6 @@ interface ApiService {
 // 2. CLIENTE RETROFIT (El objeto Singleton)
 // ==========================================
 object RetrofitClient {
-    // ⚠️ IMPORTANTE:
-    // Usa "http://10.0.2.2:8080/" si usas el Emulador de Android Studio.
-    // Usa la IP de tu PC (ej: "http://192.168.1.15:8080/") si usas celular físico.
     private const val BASE_URL = "http://10.0.2.2:8080/"
 
     val api: ApiService by lazy {

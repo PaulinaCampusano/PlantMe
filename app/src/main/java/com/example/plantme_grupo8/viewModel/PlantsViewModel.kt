@@ -165,20 +165,7 @@ class PlantsViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    /**
-     * Eliminar planta (NOTA: Necesitas implementar DELETE en el backend para que esto funcione realmente)
-     * Por ahora, solo simula o podrías implementar el endpoint después.
-     */
-    fun deletePlant(plant: ModelPlant) {
-        // TODO: Implementar endpoint DELETE /api/plantas/{id} en Spring Boot
-        // Por ahora no hace nada para no crashear
-        Log.w("PLANTS_VM", "Borrar planta no implementado en backend aun.")
-    }
 
-    /**
-     * Regar planta (PUT /api/plantas/{id}/regar)
-     * Como implementamos esto en el backend, ¡podemos usarlo!
-     */
     fun waterPlant(plant: ModelPlant) {
         viewModelScope.launch {
             val authHeader = getAuthHeader() ?: return@launch
@@ -300,6 +287,36 @@ class PlantsViewModel(application: Application) : AndroidViewModel(application) 
             // Manejo de error
         }
     }
+
+    fun deletePlant(plant: ModelPlant) {
+        viewModelScope.launch {
+            // 1. Obtener el token
+            val authHeader = getAuthHeader()
+            if (authHeader == null) return@launch
+
+            try {
+                // 2. Llamar al servidor
+                // Nota: Asegúrate de que en ApiService agregaste el parámetro 'token'
+                val response = RetrofitClient.api.deletePlant(authHeader, plant.id)
+
+                if (response.isSuccessful) {
+                    Log.d("PLANTS_VM", "Planta eliminada: ${plant.name}")
+
+                    // 3. Recargar la lista para que desaparezca de la pantalla
+                    loadPlantsFromServer()
+
+                    // También limpiamos cualquier notificación pendiente de esa planta
+                    unmarkDue(plant.id)
+                } else {
+                    Log.e("PLANTS_VM", "Error al eliminar: ${response.code()}")
+                }
+            } catch (e: Exception) {
+                Log.e("PLANTS_VM", "Excepción al eliminar: ${e.message}")
+            }
+        }
+    }
+
+
 
 
     // --- LÓGICA DE NOTIFICACIONES RECUPERADA ---
