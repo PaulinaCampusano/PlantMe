@@ -4,6 +4,7 @@ package com.example.plantme_grupo8.ui.screens
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.widget.Toast
 import androidx.annotation.DrawableRes
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Image
@@ -12,27 +13,12 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material3.Button
-import androidx.compose.material3.DropdownMenu
-import androidx.compose.material3.DropdownMenuItem
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.ExposedDropdownMenuBox
-import androidx.compose.material3.ExposedDropdownMenuDefaults
-import androidx.compose.material3.Icon
-import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -45,28 +31,12 @@ import com.example.plantme_grupo8.ui.theme.utils.SpeciesDefault
 import com.example.plantme_grupo8.viewModel.PlantsViewModel
 import java.text.SimpleDateFormat
 import java.util.Calendar
-import java.util.Date
 import java.util.Locale
-import androidx.compose.material3.OutlinedTextFieldDefaults
-import android.widget.Toast
-import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material.icons.outlined.Add
-import androidx.compose.material3.*
-import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
-
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-
-
 
 @Composable
 fun AddPlantScreen(
-    vm: PlantsViewModel,       // <-- Coincide con AppNavHost
-    onBack: () -> Unit,        // <-- Coincide con AppNavHost (sirve para cancelar y para salir al guardar)
+    vm: PlantsViewModel,
+    onBack: () -> Unit,
     @DrawableRes photoRes: Int? = R.drawable.backagroudhs
 ) {
     val context = LocalContext.current
@@ -77,17 +47,18 @@ fun AddPlantScreen(
 
     // Dropdown Especies
     var expanded by remember { mutableStateOf(false) }
-    var selectedKey by rememberSaveable { mutableStateOf("cactus") } // Valor por defecto seguro
-    val speciesList = SpeciesDefault.getAllKeys()
+    var selectedKey by rememberSaveable { mutableStateOf("cactus") }
+    // Usamos el helper corregido de SpeciesDefault
+    val speciesKeys = SpeciesDefault.getAllKeys()
 
     // Fechas (Riego)
     val calendar = remember { Calendar.getInstance() }
     var lastWateredMillis by rememberSaveable { mutableStateOf(System.currentTimeMillis()) }
 
-    // Estado de carga (Backend)
+    // Estado de carga
     var isLoading by remember { mutableStateOf(false) }
 
-    // Formateador para mostrar la fecha bonita en pantalla
+    // Formateador para mostrar la fecha bonita
     val dateFormat = remember { SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault()) }
 
     Box(modifier = Modifier.fillMaxSize()) {
@@ -100,12 +71,7 @@ fun AddPlantScreen(
                 modifier = Modifier.fillMaxSize()
             )
         } else {
-            // Fondo gris oscuro si no hay imagen
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .background(Color(0xFF2D3B2D))
-            )
+            Box(modifier = Modifier.fillMaxSize().background(Color(0xFF2D3B2D)))
         }
 
         // 2. Contenido
@@ -113,7 +79,7 @@ fun AddPlantScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(24.dp)
-                .systemBarsPadding(), // Evita que se solape con la barra de estado
+                .systemBarsPadding(),
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.Center
         ) {
@@ -158,8 +124,11 @@ fun AddPlantScreen(
                 onExpandedChange = { expanded = !expanded },
                 modifier = Modifier.fillMaxWidth()
             ) {
+                // Obtener nombre bonito para mostrar
+                val displayValue = SpeciesDefault.displayFor(selectedKey) ?: selectedKey
+
                 OutlinedTextField(
-                    value = SpeciesDefault.displayFor(selectedKey) ?: selectedKey,
+                    value = displayValue,
                     onValueChange = {},
                     readOnly = true,
                     label = { Text("Especie", color = Color.White) },
@@ -170,15 +139,13 @@ fun AddPlantScreen(
                         focusedTextColor = Color.White,
                         unfocusedTextColor = Color.White
                     ),
-                    modifier = Modifier
-                        .menuAnchor()
-                        .fillMaxWidth()
+                    modifier = Modifier.menuAnchor().fillMaxWidth()
                 )
                 ExposedDropdownMenu(
                     expanded = expanded,
                     onDismissRequest = { expanded = false }
                 ) {
-                    speciesList.forEach { key ->
+                    speciesKeys.forEach { key ->
                         DropdownMenuItem(
                             text = { Text(SpeciesDefault.displayFor(key) ?: key) },
                             onClick = {
@@ -217,7 +184,7 @@ fun AddPlantScreen(
                                 calendar.set(Calendar.MONTH, month)
                                 calendar.set(Calendar.DAY_OF_MONTH, dayOfMonth)
 
-                                // Diálogo Hora (después de fecha)
+                                // Diálogo Hora
                                 TimePickerDialog(
                                     context,
                                     { _, hourOfDay, minute ->
@@ -251,38 +218,31 @@ fun AddPlantScreen(
 
             // -- BOTONES --
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                // Botón Cancelar
                 OutlinedButton(
-                    onClick = onBack, // Vuelve atrás
+                    onClick = onBack,
                     border = BorderStroke(1.dp, Color.White),
                     modifier = Modifier.weight(1f),
-                    enabled = !isLoading // Desactivar si está cargando
+                    enabled = !isLoading
                 ) {
                     Text("Cancelar", color = Color.White)
                 }
 
-                // Botón Guardar
                 Button(
                     onClick = {
                         nameError = name.isBlank()
                         if (!nameError) {
                             isLoading = true
 
-                            // 1. Convertir milisegundos a String ISO para el Backend
-                            // El backend espera: "2025-12-01T10:00:00"
-                            val instant = java.time.Instant.ofEpochMilli(lastWateredMillis)
-                            val zoneId = java.time.ZoneId.systemDefault()
-                            val isoDate = instant.atZone(zoneId).format(java.time.format.DateTimeFormatter.ISO_LOCAL_DATE_TIME)
-
-                            // 2. Llamada al ViewModel
+                            // CORRECCIÓN AQUÍ:
+                            // Ya no convertimos la fecha. Enviamos el Long directamente.
                             vm.createPlant(
                                 nombre = name.trim(),
                                 speciesKey = selectedKey,
-                                ultimoRiego = isoDate,
+                                ultimoRiegoMillis = lastWateredMillis, // Enviamos Long
                                 onSuccess = {
                                     isLoading = false
                                     Toast.makeText(context, "¡Planta Guardada!", Toast.LENGTH_SHORT).show()
-                                    onBack() // Volver al Home
+                                    onBack()
                                 },
                                 onError = { errorMsg ->
                                     isLoading = false
@@ -293,16 +253,10 @@ fun AddPlantScreen(
                     },
                     modifier = Modifier.weight(1f),
                     enabled = !isLoading,
-                    colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF4CAF50) // Verde bonito
-                    )
+                    colors = ButtonDefaults.buttonColors(containerColor = Color(0xFF4CAF50))
                 ) {
                     if (isLoading) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(20.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp
-                        )
+                        CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
                     } else {
                         Text("Guardar")
                     }

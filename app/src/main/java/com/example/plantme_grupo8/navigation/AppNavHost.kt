@@ -64,6 +64,7 @@ fun AppNavHost(
             }
         }
     } else {
+        // --- FLUJO CUANDO EL USUARIO NO ESTÁ LOGUEADO ---
         NavHost(
             navController = navController,
             startDestination = AppRoute.Login.route
@@ -72,11 +73,13 @@ fun AppNavHost(
                 LoginScreen(
                     vm = authVm,
                     onGoRegister = { navController.navigate(AppRoute.Register.route) },
+
+                    // 🔥 CORRECCIÓN AQUÍ:
+                    // No navegamos manualmente. Solo dejamos el bloque vacío o loggeamos algo.
+                    // Al cambiar 'logged' a true, el 'if' de arriba se activará y mostrará el Home solo.
                     onLoggedIn = {
-                        // Al loguearse, vamos al Home y borramos el historial de atrás
-                        navController.navigate(AppRoute.Home.route) {
-                            popUpTo(0) { inclusive = true }
-                        }
+                        // NO HACER NADA AQUÍ (Opcional: un println de debug)
+                        // navController.navigate(...) <--- ESTO CAUSABA EL CRASH
                     }
                 )
             }
@@ -84,10 +87,10 @@ fun AppNavHost(
                 RegisterScreen(
                     vm = authVm,
                     onRegistered = {
-                        // Al registrarse, vamos al Home
-                        navController.navigate(AppRoute.Home.route) {
-                            popUpTo(0) { inclusive = true }
-                        }
+                        // Aquí sí podríamos navegar, o dejar que el usuario vaya al login manual
+                        // Si tu AuthViewModel hace login automático al registrar, deja esto vacío.
+                        // Si no, navegar al login está bien.
+                        navController.popBackStack() // Volver al Login para que ingrese
                     },
                     onCancel = { navController.popBackStack() }
                 )
