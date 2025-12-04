@@ -1,21 +1,15 @@
 package com.example.plantme_grupo8
 
-
 import org.junit.Test
 import org.junit.Assert.*
 
 /**
- * Prueba unitaria para verificar la lógica de cálculo de plantas
+ * Pruebas unitarias para la lógica básica de plantas:
+ * - Cálculo de días restantes usando milisegundos
+ * - Frecuencia de riego según especie
  */
 class PlantLogicTest {
-
-    // Prueba 1: Sanity Check (debe pasar siempre)
-    @Test
-    fun addition_isCorrect() {
-        assertEquals(4, 2 + 2)
-    }
-
-    // Prueba 2: Simula cálculo de días restantes (como en HomeScreen)
+    // Prueba 1: Simula cálculo de días restantes (como en HomeScreen)
     @Test
     fun calculateDaysRemaining_isCorrect() {
         // Configuramos el próximo riego para que sea en 2 días exactos
@@ -31,7 +25,7 @@ class PlantLogicTest {
         assertEquals(2, days)
     }
 
-    // Prueba 3: Simula la lógica de intervalos (frecuencia de riego por especie)
+    // Prueba 2: Simula la lógica de intervalos (frecuencia de riego por especie)
     @Test
     fun speciesFrequency_isCorrect() {
         val speciesKey = "cactus"
@@ -44,10 +38,10 @@ class PlantLogicTest {
 
     // Función auxiliar que simula la tabla de frecuencias de riego
     private fun getFrequency(key: String): Int {
-        return when(key) {
+        return when (key.lowercase()) {
             "cactus" -> 7
-            "flor" -> 3
-            else -> 1
+            "flor"   -> 3
+            else     -> 1
         }
     }
 }
