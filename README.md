@@ -1,82 +1,138 @@
-# PlantMe
+🌟 README – PLANTME (FRONTEND / ANDROID)
+📱 Jetpack Compose • MVVM • Retrofit • DataStore • JWT
+<div align="center">
 
-# 🌿 PlantMe
+# 🌱 PlantMe – Asistente Inteligente de Riego
+# La app que te recuerda cuándo regar tus plantas 🌿💧
+</div>
 
-**PlantMe** es una aplicación móvil desarrollada en **Kotlin (Jetpack Compose)** que permite al usuario registrar y administrar sus plantas, visualizar la lista de especies agregadas y recibir recordatorios para regarlas según su tipo y último riego.  
-Su objetivo es fomentar el cuidado responsable de las plantas a través de una interfaz intuitiva, atractiva y funcional.
+📌 Nuestra App
 
----
+Las personas suelen olvidar regar sus plantas o no saber cada cuánto hacerlo. Esto provoca que muchas mueran innecesariamente.
 
-## 👩‍💻 Integrantes del equipo
-- **Karol Giraldo**
-- **Paulina Campusano**
----
+PlantMe nace para resolver ese problema mediante:
 
-## 🪴 Descripción del proyecto
+Registro de plantas con especie y frecuencia.
 
-La aplicación está compuesta por tres pantallas principales, accesibles mediante una **barra de navegación inferior (BottomBar)**:
+Cálculo automático de próxima fecha de riego.
 
-1. **HomeScreen** → Muestra la lista de plantas registradas por el usuario y el tiempo restante para regarlas.  
-   - Si una planta llega a su tiempo de riego, se muestra el botón **“Regado listo”**, el cual reinicia el contador automáticamente.
-2. **AddPlantScreen** → Permite agregar una nueva planta seleccionando su nombre, tipo y fecha/hora del último riego.  
-   - El intervalo de riego se calcula automáticamente según el tipo de planta elegido.
-3. **AccountScreen** → Muestra la información del usuario (nombre, cantidad de plantas registradas) y opciones de configuración como **cerrar sesión** o **eliminar cuenta**.
+Contadores dinámicos en tiempo real.
 
-Además, la aplicación incluye:
-- **Pantalla de Login y Registro** con validación de credenciales y spinner.  
-- **Animación de carga (loader)** al iniciar sesión.  
-- **Fondo personalizado** y colores adaptados a la temática natural de la aplicación.
+Persistencia de datos entre sesiones.
 
----
+Autenticación segura con JWT.
 
-## ⚙️ Funcionalidades implementadas
+🧩 Arquitectura del Proyecto
 
-| Categoría | Descripción |
-|------------|-------------|
-| **Arquitectura** | MVVM (Model - ViewModel - View) |
-| **Persistencia local** | DataStore para guardar plantas y sesión |
-| **Interfaz** | Jetpack Compose (Material 3) |
-| **Navegación** | Navigation Compose + NavHostController |
-| **Validaciones** | Email, contraseña y campos vacíos |
-| **Notificaciones lógicas** | Botón dinámico “Regado listo” |
-| **Diseño** | Imagen de fondo, gradientes y componentes personalizados |
+PlantMe utiliza el patrón MVVM, lo cual permite:
 
----
+Separar UI, lógica y datos.
 
-🚀 Pasos para ejecutar el proyecto
+Facilitar escalabilidad.
 
-1️⃣ Requisitos previos
+Mejorar mantenibilidad.
+
+Habilitar pruebas unitarias efectivas.
+
+🛠 Tecnologías Principales
+Capa	Tecnología
+Lenguaje	Kotlin
+UI	Jetpack Compose
+Estado	ViewModel + StateFlow
+Persistencia	DataStore
+Networking	Retrofit + GSON
+Seguridad	JWT
+Testing	JUnit
+
+🔗 Integración con el Backend (Microservicios)
+
+La aplicación móvil se comunica con una API REST desarrollada en Spring Boot.
+
+⚠ Requisito obligatorio
+
+➡️ Para que el FRONT funcione, el BACKEND debe estar levantado en localhost:8080.
+
+📡 URL utilizada por Retrofit
+
+En emuladores Android:
+
+http://10.0.2.2:8080/api/
+
+🔐  Manejo de Seguridad – JWT
+
+Al iniciar sesión:
+
+El servidor entrega un JWT
+
+El token se guarda en DataStore
+
+Se envía en cada request:
+
+Authorization: Bearer <token>
+
+
+Ejemplo en ViewModel:
+
+private suspend fun getAuthHeader(): String? {
+    val token = dataStore.data.first()[JWT_TOKEN_KEY]
+    return token?.let { "Bearer $it" }
+}
+
+🧪  Pruebas Unitarias (IE 3.2.2)
+
+Se implementaron pruebas para:
+
+✔ Lógica de riego
+✔ Cálculo de días restantes
+✔ Frecuencias por especie
+✔ Validaciones de formulario
+✔ Formateo de UI
+✔ Lógica de reinicio de contador
+
+Ubicación:
+
+app/src/test/java/com/example/plantme_grupo8/
+
+▶️  Ejecución del Proyecto (Pasos de instalación)
+🔧 Requisitos
 
 Android Studio Flamingo o superior
 
-Kotlin configurado (versión 1.9+)
+SDK 33+
 
-Gradle actualizado (mínimo versión 8.0)
+Backend funcionando en localhost:8080
 
-Emulador Android o dispositivo físico conectado
-
-
-2️⃣ Clonar el repositorio
-
-git clone https://github.com/usuario/PlantMe.git
-
-3️⃣ Abrir en Android Studio
-
-1. Abrir Android Studio
+🚀 Pasos
+git clone https://github.com/PaulinaCampusano/PlantMe.git
 
 
-2. Seleccionar File → Open...
+Abrir en Android Studio
 
+Instalar dependencias con Gradle
 
-3. Buscar la carpeta del proyecto PlantMe
+Levantar backend antes de correr la app
 
+Ejecutar con un emulador o dispositivo físico
 
-4. Esperar a que Gradle sincronice las dependencias
+✔ Flujo funcional
 
+Registro
 
+Login
 
-4️⃣ Ejecutar la aplicación
+Crear planta
 
-Selecciona el emulador o tu dispositivo físico
+Ver contadores dinámicos
 
-Presiona ▶️ Run App (Shift + F10)
+Presionar “Regar” → contador se reinicia correctamente
+
+👥 Integrantes del equipo
+
+Paulina Campusano
+
+Karol Giraldo	
+
+<div align="center">
+
+# 🌿 PlantMe — Cuidar tus plantas nunca fue tan fácil
+</div>
