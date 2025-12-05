@@ -42,6 +42,7 @@ import android.app.DatePickerDialog
 import android.app.TimePickerDialog
 import android.content.pm.PackageManager
 import android.os.Build
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -65,10 +66,10 @@ import com.example.plantme_grupo8.ui.theme.utils.SpeciesDefault
 import com.example.plantme_grupo8.ui.theme.utils.SpeciesDefault.getAllKeys
 import com.example.plantme_grupo8.viewModel.PlantsViewModel
 import kotlinx.coroutines.delay
+import java.text.SimpleDateFormat
 import java.util.concurrent.TimeUnit
 import kotlin.math.abs
-import com.example.plantme_grupo8.ui.theme.utils.SpeciesDefault.getAllSpecies
-import com.example.plantme_grupo8.ui.theme.utils.SpeciesDefault.displayFor
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun HomeScreen(
@@ -76,8 +77,19 @@ fun HomeScreen(
     vm: PlantsViewModel,
     @DrawableRes photoRes: Int? = R.drawable.backagroudhs
 ) {
+
+
     val plants by vm.plants.collectAsState()
     val context = LocalContext.current
+
+    // Reloj global que se actualiza cada segundo para todos los ítems
+    var now by remember { mutableStateOf(System.currentTimeMillis()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            delay(1000L)
+            now = System.currentTimeMillis()
+        }
+    }
 
     // ESTADO PARA EL DIÁLOGO DE EDICIÓN
     var plantToEdit by remember { mutableStateOf<ModelPlant?>(null) }
@@ -127,7 +139,10 @@ fun HomeScreen(
                 }
             } else {
                 LazyColumn(
-                    modifier = Modifier.fillMaxSize().padding(innerPadding).padding(horizontal = 16.dp),
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .padding(innerPadding)
+                        .padding(horizontal = 16.dp),
                     verticalArrangement = Arrangement.spacedBy(12.dp)
                 ) {
                     item { Spacer(modifier = Modifier.height(8.dp)) }
@@ -138,6 +153,7 @@ fun HomeScreen(
                     ) { plant ->
                         PlantItemWithTimer(
                             plant = plant,
+                            now = now,
                             onWater = { vm.waterPlant(plant) },
                             onEdit = { plantToEdit = plant },
                             onDelete = { plantToDelete = plant }
@@ -154,14 +170,14 @@ fun HomeScreen(
     plantToEdit?.let { plant ->
         EditPlantDialog(
             plant = plant,
-            // AQUI faltaba el vm = vm
+
             onSave = { name, speciesKey, lastWateredMillis ->
                 vm.updatePlant(plant.id, name, speciesKey, lastWateredMillis)
-                // Cierra el diálogo después de guardar
+
                 plantToEdit = null
             },
             onDismiss = {
-                // Cierra el diálogo si se cancela
+
                 plantToEdit = null
             }
         )
@@ -188,24 +204,25 @@ fun HomeScreen(
         )
     }
 }
-
 @Composable
 fun PlantItemWithTimer(
     plant: ModelPlant,
+    now: Long,
     onWater: () -> Unit,
     onEdit: () -> Unit,
     onDelete: () -> Unit
 ) {
-    var now by remember { mutableStateOf(System.currentTimeMillis()) }
-
-    LaunchedEffect(Unit) {
-        while (true) {
-            delay(1000L)
-            now = System.currentTimeMillis()
-        }
+    // Log de diagnóstico para ver la fecha de siguiente riego
+    LaunchedEffect(plant.id) {
+        val nextDate = SimpleDateFormat("dd/MM HH:mm:ss", Locale.getDefault())
+            .format(Date(plant.nextWateringAtMillis))
+        Log.d("DIAGNOSIS_Riego", "ID: ${plant.id} (${plant.name}) | Siguiente Riego: $nextDate")
     }
 
-    val diff = plant.nextWateringAtMillis - now
+    // Ajustamos un poquito el diff para evitar mostrar exactamente "30d 0h 0m"
+    val rawDiff = plant.nextWateringAtMillis - now
+    val diff = if (rawDiff > 0L) rawDiff - 1000L else rawDiff
+
     val isDue = diff <= 0
     val statusText = formatDuration(diff)
     val statusColor = if (isDue) Color.Red else Color(0xFF4CAF50)

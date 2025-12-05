@@ -22,6 +22,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.update
+
 
 class PlantsViewModel(application: Application) : AndroidViewModel(application) {
 
@@ -75,18 +77,6 @@ class PlantsViewModel(application: Application) : AndroidViewModel(application) 
         }
     }
 
-    // SOBRECARGA para compatibilidad si tu UI envía String (AddPlantScreen antigua)
-    // Intenta usar la de arriba modificando AddPlantScreen si puedes.
-    fun createPlant(nombre: String, speciesKey: String, ultimoRiegoISO: String, onSuccess: () -> Unit, onError: (String) -> Unit) {
-        // Convertimos el String ISO a Long para pasarlo al Repo
-        val millis = try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                java.time.LocalDateTime.parse(ultimoRiegoISO).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
-            } else 0L
-        } catch (e: Exception) { System.currentTimeMillis() }
-
-        createPlant(nombre, speciesKey, millis, onSuccess, onError)
-    }
 
     fun updatePlant(id: Long, name: String, speciesKey: String, lastWateredMillis: Long) {
         viewModelScope.launch {
@@ -112,14 +102,25 @@ class PlantsViewModel(application: Application) : AndroidViewModel(application) 
 
     fun waterPlant(plant: ModelPlant) {
         viewModelScope.launch {
+            // El repositorio ahora devuelve ModelPlant actualizado
             repository.waterPlant(plant.id)
-                .onSuccess {
-                    loadPlantsFromServer()
+                .onSuccess { updatedPlant ->
+                    // 1. Encontramos y actualizamos la lista local (_plants)
+                    _plants.update { currentList ->
+                        currentList.map { p ->
+                            if (p.id == updatedPlant.id) updatedPlant.copy(isDue = false) // Reemplazamos la planta regada
+                            else p
+                        }
+                    }
+                    // 2. Limpiamos la notificación local
                     repository.removeDueId(plant.id)
+
                 }
-                .onFailure { Log.e("PLANTS_VM", "Error water: ${it.message}") }
+                .onFailure { e -> Log.e("PLANTS_VM", "Error water: ${e.message}") }
         }
     }
+
+
 
     // --- NOTIFICACIONES (Lógica de UI) ---
 

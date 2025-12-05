@@ -1,6 +1,5 @@
 package com.example.plantme_grupo8.repository
 
-import android.util.Log
 import androidx.datastore.core.DataStore
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.edit
@@ -12,14 +11,13 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.serialization.encodeToString
-import kotlinx.serialization.decodeFromString
 import kotlinx.serialization.json.Json
 import java.time.Instant
 import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import kotlin.text.isNullOrEmpty
 
-// Claves de DataStore
 private val JWT_TOKEN_KEY = stringPreferencesKey("jwt_token")
 private val DUE_IDS_KEY = stringPreferencesKey("due_ids")
 
@@ -122,12 +120,28 @@ class PlantsRepository(private val dataStore: DataStore<Preferences>) {
     }
 
     // 4. REGAR PLANTA
-    suspend fun waterPlant(id: Long): Result<Unit> {
+    suspend fun waterPlant(id: Long): Result<ModelPlant> { // <--- CAMBIO: Ahora devuelve ModelPlant
         val token = getAuthHeader() ?: return Result.failure(Exception("No hay sesión"))
         return try {
             val response = api.waterPlant(token, id)
-            if (response.isSuccessful) Result.success(Unit)
-            else Result.failure(Exception("Error ${response.code()}"))
+
+            if (response.isSuccessful && response.body() != null) {
+                // Mapeamos el DTO de respuesta (PlantResponse) a ModelPlant
+                val dto = response.body()!!
+                val updatedPlant = ModelPlant(
+                    id = dto.id,
+                    name = dto.nombre,
+                    speciesKey = dto.speciesKey,
+                    intervalDays = dto.frecuenciaDias,
+                    nextWateringAtMillis = isoStringToMillis(dto.siguienteRiego),
+                    lastWateringAtMillis = isoStringToMillis(dto.ultimoRiego),
+                    isMarked = false, // El ViewModel gestiona estos estados
+                    isDue = false
+                )
+                Result.success(updatedPlant) // <--- DEVOLVEMOS el objeto actualizado
+            } else {
+                Result.failure(Exception("Error ${response.code()}"))
+            }
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -152,7 +166,7 @@ class PlantsRepository(private val dataStore: DataStore<Preferences>) {
                 ZonedDateTime.parse(isoString).toInstant().toEpochMilli()
             } else {
                 java.time.LocalDateTime.parse(isoString)
-                    .atZone(ZoneId.systemDefault())
+                    .atZone(ZoneId.of("UTC"))
                     .toInstant().toEpochMilli()
             }
         } catch (e: Exception) {
@@ -163,7 +177,7 @@ class PlantsRepository(private val dataStore: DataStore<Preferences>) {
     private fun isoStringFromMillis(millis: Long): String {
         return try {
             Instant.ofEpochMilli(millis)
-                .atZone(ZoneId.systemDefault())
+                .atZone(ZoneId.of("UTC"))
                 .format(DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss"))
         } catch (e: Exception) {
             ZonedDateTime.now().format(DateTimeFormatter.ISO_LOCAL_DATE_TIME)
